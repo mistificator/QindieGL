@@ -14,7 +14,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # DirectX9 SDK path
-# default path for this SDK https://www.microsoft.com/ru-ru/download/details.aspx?id=6812
+# default path for this SDK https://www.microsoft.com/en-us/download/details.aspx?id=6812
 set(DIRECTX9_SDK_PATH "C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)" CACHE PATH "Path to DirectX9 SDK")
 
 # Output paths

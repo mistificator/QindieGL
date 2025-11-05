@@ -393,6 +393,9 @@ OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 		}
 	}
 
+	if (PROC directNamedFuncHandle = GetProcAddress(GetModuleHandle("opengl32.dll"), s))
+		return directNamedFuncHandle;
+
 	++stubAddress;
 
 	if (pszDisabledExt)
