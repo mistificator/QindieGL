@@ -1,3 +1,17 @@
+# QindieGL fork with Cmake build
+
+## How to build
+
+1. Download and install DirectX9 SDK
+   https://www.microsoft.com/en-us/download/details.aspx?id=6812
+2. Go to cmake folder
+3. cmake ./ -B ../build
+4. cmake --build ../build --config Release
+5. Get your opengl32.dll in build/bin/Release
+6. Read the original readme below
+
+---
+
 # QindieGL
 ## QindieGL Is Not Driver, It's Emulator
 **Version 1.0 rev. 5 (November 2016)**
