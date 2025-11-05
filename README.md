@@ -1,9 +1,13 @@
-# QindieGL fork with Cmake build
+# QindieGL fork with Cmake build and x64 support
+
+## Newly supported Games
+- [EDuke32](https://www.eduke32.com/) 
+
+## Where to download binaries
+Look at [releases](https://github.com/mistificator/QindieGL/releases/) section.
 
 ## How to build
-
-1. Download and install DirectX9 SDK
-   https://www.microsoft.com/en-us/download/details.aspx?id=6812
+1. Download and install [DirectX9 SDK](https://www.microsoft.com/en-us/download/details.aspx?id=6812)
 2. Go to cmake folder
 3. cmake ./ -B ../build
 4. cmake --build ../build --config Release
