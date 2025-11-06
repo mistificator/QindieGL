@@ -1,3 +1,20 @@
+# QindieGL fork with Cmake build and x64 support
+
+## Newly supported Games
+- [EDuke32](https://www.eduke32.com/) 
+
+## Where to download binaries
+Look at [releases](https://github.com/mistificator/QindieGL/releases/) section.
+
+## How to build
+1. Download and install [DirectX9 SDK](https://www.microsoft.com/en-us/download/details.aspx?id=6812)
+2. cmake ./ -B ../build
+3. cmake --build ../build --config Release
+4. Get your opengl32.dll in build/x64/bin/Release
+5. Read the original readme below
+
+---
+
 # QindieGL
 ## QindieGL Is Not Driver, It's Emulator
 

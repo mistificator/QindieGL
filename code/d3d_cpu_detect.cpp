@@ -24,6 +24,8 @@
 #include "d3d_utils.hpp"
 #include "d3d_matrix_stack.hpp"
 
+#include <intrin.h>
+
 //==================================================================================
 // CPU features detect
 //----------------------------------------------------------------------------------
@@ -32,30 +34,13 @@
 
 static bool cpuid( unsigned long function, unsigned long& out_eax, unsigned long& out_ebx, unsigned long& out_ecx, unsigned long& out_edx )
 {
-	bool retval = true;
-	unsigned long local_eax, local_ebx, local_ecx, local_edx;
-	_asm pushad;
-
-	__try {
-        _asm {
-			xor edx, edx
-            mov eax, function
-            cpuid
-            mov local_eax, eax
-            mov local_ebx, ebx
-            mov local_ecx, ecx
-            mov local_edx, edx
-		}
-    } __except(EXCEPTION_EXECUTE_HANDLER) { 
-		retval = false; 
-	}
-
-	out_eax = local_eax;
-	out_ebx = local_ebx;
-	out_ecx = local_ecx;
-	out_edx = local_edx;
-	_asm popad
-	return retval;
+	int info[4];
+    __cpuid(info, function);
+	out_eax = *reinterpret_cast<unsigned long *>(&info[0]);
+	out_ebx = *reinterpret_cast<unsigned long *>(&info[1]);
+	out_ecx = *reinterpret_cast<unsigned long *>(&info[2]);
+	out_edx = *reinterpret_cast<unsigned long *>(&info[3]);
+	return true;
 }
 
 void D3DGlobal_CPU_Detect()

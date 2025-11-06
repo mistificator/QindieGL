@@ -70,6 +70,9 @@ static void TexGenFunc_ObjectLinear( int stage, int coord, const GLfloat* vertex
 	*output_texcoord = out_coord;
 }
 
+#ifdef _WIN64
+#define TexGenFunc_ObjectLinear_SSE TexGenFunc_ObjectLinear
+#else
 static void TexGenFunc_ObjectLinear_SSE( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
 	_declspec(align(16)) float sse_vertex[4];
@@ -92,6 +95,7 @@ static void TexGenFunc_ObjectLinear_SSE( int stage, int coord, const GLfloat* ve
 	}
 	*output_texcoord = out_coord;
 }
+#endif
 
 static void TexGenFunc_EyeLinear( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
@@ -102,6 +106,9 @@ static void TexGenFunc_EyeLinear( int stage, int coord, const GLfloat* vertex, c
 	*output_texcoord = out_coord;
 }
 
+#ifdef _WIN64
+#define TexGenFunc_EyeLinear_SSE TexGenFunc_EyeLinear
+#else
 static void TexGenFunc_EyeLinear_SSE( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
 	_declspec(align(16)) float sse_vertex[4];
@@ -124,6 +131,7 @@ static void TexGenFunc_EyeLinear_SSE( int stage, int coord, const GLfloat* verte
 	}
 	*output_texcoord = out_coord;
 }
+#endif
 
 static void TexGenFunc_SphereMap( int /*stage*/, int coord, const GLfloat* vertex, const GLfloat* normal, float *output_texcoord )
 {
@@ -143,6 +151,9 @@ static void TexGenFunc_SphereMap( int /*stage*/, int coord, const GLfloat* verte
 	}
 }
 
+#ifdef _WIN64
+#define TexGenFunc_SphereMap_SSE TexGenFunc_SphereMap
+#else
 static void TexGenFunc_SphereMap_SSE( int /*stage*/, int coord, const GLfloat* vertex, const GLfloat* normal, float *output_texcoord )
 {
 	if (coord == 3) {
@@ -200,6 +211,7 @@ static void TexGenFunc_SphereMap_SSE( int /*stage*/, int coord, const GLfloat* v
 		*output_texcoord = out_coord[coord];
 	}
 }
+#endif
 
 static void TexGenFunc_ReflectionMap( int /*stage*/, int coord, const GLfloat* vertex, const GLfloat* normal, float *output_texcoord )
 {
@@ -211,6 +223,9 @@ static void TexGenFunc_ReflectionMap( int /*stage*/, int coord, const GLfloat* v
 	}
 }
 
+#ifdef _WIN64
+#define TexGenFunc_ReflectionMap_SSE TexGenFunc_ReflectionMap
+#else
 static void TexGenFunc_ReflectionMap_SSE( int /*stage*/, int coord, const GLfloat* vertex, const GLfloat* normal, float *output_texcoord )
 {
 	if (coord == 3) {
@@ -250,6 +265,7 @@ static void TexGenFunc_ReflectionMap_SSE( int /*stage*/, int coord, const GLfloa
 		*output_texcoord = out_coord[coord];
 	}
 }
+#endif
 
 static void TexGenFunc_NormalMap( int /*stage*/, int coord, const GLfloat* /*vertex*/, const GLfloat* normal, float *output_texcoord )
 {

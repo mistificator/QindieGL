@@ -401,8 +401,6 @@ OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 		}
 	}
 
-	//++stubAddress;
-
 	if (pszDisabledExt)
 		logPrintf("WARNING: wglGetProcAddress: queried disabled proc '%s' (extension '%s') (stub = 0x%X)\n", s, pszDisabledExt, stubAddress);
 	else
