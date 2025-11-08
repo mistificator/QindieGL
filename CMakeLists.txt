@@ -147,7 +147,7 @@ target_compile_definitions(QindieGL PRIVATE
 
 if (${ARCH} STREQUAL "x86")
 	add_subdirectory(idtech3_mixup)
-    target_link_libraries(QindieGL PRIVATE idtech3_mixup.lib)
+    target_link_libraries(QindieGL PRIVATE idtech3_mixup_lib)
     target_sources(QindieGL PRIVATE 
         ../extern/detours/src/detours.cpp
         ../extern/detours/src/disasm.cpp
