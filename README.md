@@ -8,21 +8,42 @@ Look at [releases](https://github.com/mistificator/QindieGL/releases/) section.
 
 ## How to build
 1. Download and install [DirectX9 SDK](https://www.microsoft.com/en-us/download/details.aspx?id=6812)
-2. Go to cmake folder
-3. cmake ./ -B ../build
-4. cmake --build ../build --config Release
-5. Get your opengl32.dll in build/bin/Release
-6. Read the original readme below
+2. cmake ./ -B ../build
+3. cmake --build ../build --config Release
+4. Get your opengl32.dll in build/x64/bin/Release
+5. Read the original readme below
 
 ---
 
 # QindieGL
 ## QindieGL Is Not Driver, It's Emulator
-**Version 1.0 rev. 5 (November 2016)**
 
 ![QindieGL Logo](logo/QIndieGL-Logo-small.png?raw=true)
 
-[Download Win32 32-bit Binaries](https://github.com/crystice-softworks/QindieGL/raw/master/bin/QindieGL.1.0.rev5.zip)
+## What's special about this fork?
+
+Since my modification of Return to Castle Wolfenstein open source to support RTX-remix, I was wondering if other idtech3 games could be enhanced with camera detection and stable geometry.
+
+So far I have released a camera hack for idtech3: I noticed RTCW stores the camera and the modelview matrix (model/world * camera) in two globals;
+I can detect the camera global (by comparing the pointers) and the model matrix can be obtained by multiplying modelview * camera-inverse.
+We'll see if this is sufficient.
+
+For idtech2 games, I've noticed the game builds up the camera matrix with gl rotate and translate, then saves it for later use;
+I've used this (getvalue) as trigger to make it the camera matrix, and any later scale/rotate/translate would be considered model matrix.
+
+WIP: Stabilising geometry hashes for remix is integrated as a beta for FAKK2, and partially for CoD, Alice.
+
+Tested with: American McGee's Alice, CoD 2003, Heavy Metal FAKK2, Star Trek Elite Force 2, Open Jedi Knight, Quake2, Heretic2.
+
+NOTE: RTSS interferes with proper Remix functionality; add NvRemixBridge.exe to the exception list (OJK needs this to be able to launch).
+
+## Included in this project:
+
+- DXErr functions part of DXUT [https://github.com/Microsoft/DXUT] (MIT license)
+- mINI library [https://github.com/metayeti/mINI] (MIT license)
+- Detours library [https://github.com/microsoft/Detours] (MIT license)
+- FNV hash [http://isthe.com/chongo/tech/comp/fnv/] (CC0 1.0 Public Domain license)
+- Dear ImGui [https://github.com/ocornut/imgui] (MIT license)
 
 ## Introduction
 
@@ -38,10 +59,11 @@ QindieGL is a wrapper library which emulates OpenGL API using Microsoft Direct3D
 
 Please perform the following steps to install and enable QindieGL:
 
-1. Add the information from the `QindieGL-setup.reg` file to the Windows registry.
+1. Copy `QindieGL.ini` to the game directory. Modify in this file any settings particular to your game.
 2. Place `opengl32.dll` to the directory where the executable file of the game is located.
-3. Run the game; make sure the `QindieGL.log` file is created; this means that game has successfully hooked the wrapper.
-4. If you want to restore the native OpenGL renderer, delete the `opengl32.dll` file from the game executable's directory.
+3. Most probably the game will not load the local `opengl32.dll` due to GPU driver app interference: Rename the executable e.g. quake2dx.exe
+4. Run the game; make sure the `QindieGL.log` file is created; this means that game has successfully hooked the wrapper.
+5. If you want to restore the native OpenGL renderer, delete the `opengl32.dll` file from the game executable's directory.
 
 Please also read **Security Notice** before using QindieGL!
 

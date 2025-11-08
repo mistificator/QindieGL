@@ -22,6 +22,8 @@
 #define QINDIEGL_D3D_GLOBAL_H
 
 typedef IDirect3D9* (WINAPI *pfnDirect3DCreate9)( UINT SDKVersion );
+typedef int (WINAPI *pfnD3DPERF_BeginEvent)( D3DCOLOR col, LPCWSTR wszName );
+typedef int (WINAPI *pfnD3DPERF_EndEvent)( void );
 
 enum eInternalTextureTarget
 {
@@ -81,6 +83,8 @@ enum eVertexArrayEnable
 #define VA_TEXTURE_BIT_SHIFT	8
 #define VA_TEXTURE_BIT_MASK		0xff00
 
+#define VA_TEXTURE_BIT_IS_SET(VAR, BITNUM) (((VAR) & (1 << (VA_TEXTURE_BIT_SHIFT + (BITNUM)))) != 0)
+
 typedef struct D3DVAInfo_s
 {
 	GLint			elementCount;
@@ -110,6 +114,7 @@ typedef struct D3DGlobal_s
 	bool					deviceLost;
 	bool					sceneBegan;
 	int						skipCopyImage;
+	HMODULE                 hModule;
 	HWND					hWnd;
 	HDC						hDC;
 	HGLRC					hGLRC;
@@ -123,6 +128,8 @@ typedef struct D3DGlobal_s
 	LPDIRECT3DSWAPCHAIN9	pSwapChain;
 	LPDIRECT3DSURFACE9		pSystemMemRT;
 	LPDIRECT3DSURFACE9		pSystemMemFB;
+	pfnD3DPERF_BeginEvent   dbgBeginEvent;
+	pfnD3DPERF_EndEvent     dbgEndEvent;
 	int						iBPP;
 	bool					vSync;
 	bool					hasDepthStencil;
@@ -132,6 +139,8 @@ typedef struct D3DGlobal_s
 	char					*szExtensions;
 	char					*szWExtensions;
 	D3DMatrixStack			*modelviewMatrixStack;
+	D3DMatrixStack			*modelMatrixStack;
+	D3DMatrixStack			*viewMatrixStack;
 	D3DMatrixStack			*projectionMatrixStack;
 	D3DMatrixStack			*textureMatrixStack[MAX_D3D_TMU];
 	int						maxActiveTMU;
@@ -148,9 +157,26 @@ typedef struct D3DGlobal_s
 	struct {
 		DWORD				multisample;
 		DWORD				projectionFix;
+		DWORD				projectionMaxZFar;
 		DWORD				texcoordFix;
+		DWORD				drawcallFastPath;
 		DWORD				useSSE;
+		struct {
+			DWORD               remixapi;
+			DWORD               orthovertexshader;
+			DWORD               orthoskipuntextureddraws;
+		} game;
 	} settings;
+	struct {
+		void *vertexPtr;
+		void *normalPtr;
+	} normalPtrGuess[5];
+	struct {
+		LPDIRECT3DVERTEXSHADER9 vs;
+		LPDIRECT3DPIXELSHADER9 ps;
+		LPD3DXCONSTANTTABLE constants;
+	} orthoShaders;
+	DWORD normalPtrGuessEnabled;
 	struct {
 		GLfloat*			compiledVertexData;
 		GLfloat*			compiledNormalData;
@@ -163,12 +189,31 @@ typedef struct D3DGlobal_s
 	} compiledVertexArray;
 } D3DGlobal_t;
 
+#define GLOBAL_GAMENAME "game.global"
+
 extern D3DGlobal_t D3DGlobal;
 
 extern void D3DGlobal_Init( bool clearGlobals );
 extern void D3DGlobal_Cleanup( bool cleanupAll );
 extern const char* D3DGlobal_FormatToString( D3DFORMAT format );
 extern DWORD D3DGlobal_GetRegistryValue( const char *key, const char *section, DWORD defaultValue );
+extern void* D3DGlobal_GetIniHandler();
+extern void D3DGlobal_StoreGameName(const char *gn);
+extern const char* D3DGlobal_GetGameName();
+extern int D3DGlobal_ReadGameConf( const char* valname );
+extern void* D3DGlobal_ReadGameConfPtr( const char* valname );
+extern int D3DGlobal_ReadGameConfStr( const char* valname, char* out, int outsz );
 extern void D3DGlobal_CPU_Detect();
+extern bool D3DGlobal_IsOrthoProjection();
+extern void D3DGlobal_GetCamera( D3DXMATRIX* camera );
+
+typedef struct resolution_info_s
+{
+	char display_name[16];
+	int width;
+	int height;
+} resolution_info_t;
+
+extern int D3DGlobal_GetResolutions( resolution_info_t* resolutions, int count );
 
 #endif //QINDIEGL_D3D_GLOBAL_H

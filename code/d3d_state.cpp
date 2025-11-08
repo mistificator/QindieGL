@@ -25,6 +25,8 @@
 #include "d3d_texture.hpp"
 #include "d3d_matrix_stack.hpp"
 #include "d3d_combiners.hpp"
+#include "d3d_matrix_detection.hpp"
+#include <map>
 
 D3DState_t D3DState;
 static D3DState_t D3DStateCopy;
@@ -147,11 +149,11 @@ void D3DState_SetDepthBias()
 	HRESULT hr = S_OK;
 
 	if (!D3DState.EnableState.depthBiasEnabled) {
-		 hr = D3DGlobal.pDevice->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, 0);
-		 if (SUCCEEDED(hr)) hr = D3DGlobal.pDevice->SetRenderState(D3DRS_DEPTHBIAS, 0);
+		hr = D3DGlobal.pDevice->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, 0);
+		if (SUCCEEDED(hr)) hr = D3DGlobal.pDevice->SetRenderState(D3DRS_DEPTHBIAS, 0);
 	} else {
 		hr = D3DGlobal.pDevice->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, UTIL_FloatToDword(D3DState.PolygonState.depthBiasFactor));
-		 if (SUCCEEDED(hr)) hr = D3DGlobal.pDevice->SetRenderState(D3DRS_DEPTHBIAS, UTIL_FloatToDword(D3DState.PolygonState.depthBiasUnits));
+		if (SUCCEEDED(hr)) hr = D3DGlobal.pDevice->SetRenderState(D3DRS_DEPTHBIAS, UTIL_FloatToDword(D3DState.PolygonState.depthBiasUnits));
 	}
 	
 	if (FAILED(hr)) D3DGlobal.lastError = hr;
@@ -197,10 +199,43 @@ static void D3DState_SetTransform()
 
 	if (D3DState.modelViewMatrixModified) {
 		D3DState.modelViewMatrixModified = false;
-		hr = D3DGlobal.pDevice->SetTransform( D3DTS_WORLD, D3DGlobal.modelviewMatrixStack->top() );
-		if (FAILED(hr)) {
-			D3DGlobal.lastError = hr;
-			return;
+		static bool prev_dectection_enabled = false;
+		if (!matrix_detect_is_detection_enabled())
+		{
+			hr = D3DGlobal.pDevice->SetTransform( D3DTS_WORLD, D3DGlobal.modelviewMatrixStack->top() );
+			if (FAILED(hr)) {
+				D3DGlobal.lastError = hr;
+				return;
+			}
+
+			if (prev_dectection_enabled)
+			{
+				//in case user just disabled it, clear the view matrix
+				D3DXMATRIX mat;
+				D3DXMatrixIdentity(&mat);
+				hr = D3DGlobal.pDevice->SetTransform(D3DTS_VIEW, &mat);
+				if (FAILED(hr)) {
+					D3DGlobal.lastError = hr;
+					return;
+				}
+
+				prev_dectection_enabled = false;
+			}
+		}
+		else
+		{
+			hr = D3DGlobal.pDevice->SetTransform(D3DTS_WORLD, D3DGlobal.modelMatrixStack->top());
+			if (FAILED(hr)) {
+				D3DGlobal.lastError = hr;
+				return;
+			}
+			hr = D3DGlobal.pDevice->SetTransform(D3DTS_VIEW, D3DGlobal.viewMatrixStack->top());
+			if (FAILED(hr)) {
+				D3DGlobal.lastError = hr;
+				return;
+			}
+
+			prev_dectection_enabled = true;
 		}
 	}
 	if (D3DState.projectionMatrixModified) {
@@ -209,6 +244,24 @@ static void D3DState_SetTransform()
 		if (FAILED(hr)) {
 			D3DGlobal.lastError = hr;
 			return;
+		}
+
+		if ( D3DGlobal.settings.game.orthovertexshader)
+		{
+			if ( D3DGlobal_IsOrthoProjection() )
+			{
+				D3DGlobal.pDevice->SetVertexShader( D3DGlobal.orthoShaders.vs );
+				//D3DGlobal.pDevice->SetPixelShader( D3DGlobal.orthoShaders.ps );
+
+				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "projectionMatrix", D3DGlobal.projectionMatrixStack->top());
+				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "worldMatrix", D3DGlobal.modelMatrixStack->top());
+				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "viewMatrix", D3DGlobal.viewMatrixStack->top());
+			}
+			else
+			{
+				D3DGlobal.pDevice->SetVertexShader( NULL );
+				//D3DGlobal.pDevice->SetPixelShader( NULL );
+			}
 		}
 	}
 
@@ -414,10 +467,22 @@ void D3DState_SetTexture()
 		bool matrixChanged = D3DState.TextureState.textureEnableChanged || D3DState.textureMatrixModified[i];
 		if (matrixChanged) {
 			D3DState.textureMatrixModified[i] = false;
-			hr = D3DGlobal.pDevice->SetTransform( (D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + currentSampler), D3DGlobal.textureMatrixStack[i]->top() );
-			if (FAILED(hr)) {
-				D3DGlobal.lastError = hr;
-				break;
+			D3DStateMatrix& mat = D3DGlobal.textureMatrixStack[i]->top();
+			if ( !mat.is_identity() ||
+				D3DState.TextureState.transformEnabled )
+			{
+				if ( !D3DState.TextureState.transformEnabled )
+				{
+					D3DState.TextureState.transformEnabled = TRUE;
+					for (int j = 0; j < D3DGlobal.maxActiveTMU; ++j) {
+						D3DGlobal.pDevice->SetTextureStageState( j, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4 | D3DTTFF_PROJECTED );
+					}
+				}
+				hr = D3DGlobal.pDevice->SetTransform( (D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + currentSampler), mat );
+				if (FAILED(hr)) {
+					D3DGlobal.lastError = hr;
+					break;
+				}
 			}
 		}
 
@@ -843,8 +908,9 @@ void D3DState_SetDefaults()
 
 		//always transform texture coordinates
 		//!FIXME: maybe we should track texture matrix, and disable it if it is identity?
-		D3DGlobal.pDevice->SetTextureStageState( i, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4 | D3DTTFF_PROJECTED );
+		//D3DGlobal.pDevice->SetTextureStageState( i, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4 | D3DTTFF_PROJECTED );
 	}
+	//D3DState.TextureState.transformEnabled = TRUE;
 
 	D3DXMATRIX d3dIdentityMatrix;
 	D3DXMatrixIdentity(&d3dIdentityMatrix);
@@ -1242,10 +1308,20 @@ static void D3DState_EnableDisableState( GLenum cap, DWORD value )
 		//Kingpin keeps calling this... wtf?
 		break;
 
-	default:
-		logPrintf("WARNING: glEnable/glDisable( 0x%x ) unimplemented\n", cap);
-		D3DGlobal.lastError = E_INVALID_ENUM;
+	case GL_PN_TRIANGLES_ATI:
+		//ignore, since we're tricking the game to pass NormalPointer
 		break;
+
+	default: {
+		static std::map<uint32_t, boolean> warn_shown;
+		auto it = warn_shown.find( cap );
+		if ( it == warn_shown.end() )
+		{
+			warn_shown[cap] = true;
+			logPrintf( "WARNING: glEnable/glDisable( 0x%x ) unimplemented\n", cap );
+		}
+		D3DGlobal.lastError = E_INVALID_ENUM;
+		break; }
 	}
 }
 

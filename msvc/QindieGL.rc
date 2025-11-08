@@ -1,6 +1,8 @@
+#include "resource.h"
+
 1 VERSIONINFO
- FILEVERSION 1,1,0,1
- PRODUCTVERSION 1,1,0,1
+ FILEVERSION VER_VERSION
+ PRODUCTVERSION VER_VERSION
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -17,12 +19,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Crystice Softworks, Mist Poryvaev"
             VALUE "FileDescription", "QindieGL"
-            VALUE "FileVersion", "1.1.0.1"
+            VALUE "FileVersion", VER_VERSION_STR
             VALUE "InternalName", "opengl32.dll"
             VALUE "LegalCopyright", "Copyright (C) 2016, 2025"
             VALUE "OriginalFilename", "opengl32.dll"
             VALUE "ProductName", "QindieGL"
-            VALUE "ProductVersion", "1.1.0.1"
+            VALUE "ProductVersion", VER_VERSION_STR
         END
     END
     BLOCK "VarFileInfo"
@@ -30,3 +32,7 @@ BEGIN
         VALUE "Translation", 0x0, 1200
     END
 END
+
+RES_ID_ORTHO_VS         RES_TYPE_SHADER_FILE                     "..\\code\\shaders\\ortho_vs.hlsl"
+
+RES_ID_ORTHO_PS         RES_TYPE_SHADER_FILE                     "..\\code\\shaders\\ortho_ps.hlsl"

@@ -24,6 +24,8 @@
 #include "d3d_array.hpp"
 #include "d3d_matrix_stack.hpp"
 #include "d3d_texture.hpp"
+#include "d3d_matrix_detection.hpp"
+#include <map>
 
 //==================================================================================
 // Get* functions
@@ -356,6 +358,10 @@ template<typename T> static void glGet( GLenum pname, T *params )
 			for (int i = 0; i < 16; i++) {
 				params[i] = (T)pm->m[i/4][i%4];
 			}
+			D3DXMATRIX model, view;
+			matrix_detect_on_world_retrieve(&pm->m[0][0], &model, &view);
+			D3DGlobal.modelMatrixStack->load(model);
+			D3DGlobal.viewMatrixStack->load(view);
 			return;
 		}
 	case GL_PROJECTION_MATRIX:
@@ -515,10 +521,32 @@ template<typename T> static void glGet( GLenum pname, T *params )
 		params[0] = (T)D3DGlobal.hD3DCaps.MaxVertexIndex;
 		break;
 
-	default:
-		logPrintf("WARNING: glGet(0x%x) is not supported\n", pname);
-		params[0] = (T)0;
+	case GL_MAX_PN_TRIANGLES_TESSELATION_LEVEL_ATI:
+		params[0] = 7;
 		break;
+
+	case GL_COLOR_CLEAR_VALUE: {
+		const DWORD color = D3DState.ColorBufferState.clearColor;
+		const float r = float( (color >> 16) & 0xFF ) / 255;
+		const float g = float( (color >> 8) & 0xFF ) / 255;
+		const float b = float( (color) & 0xFF ) / 255;
+		const float a = float( (color >> 24) & 0xFF ) / 255;
+		params[0] = T(r);
+		params[1] = T(g);
+		params[2] = T(b);
+		params[3] = T(a);
+		break; }
+
+	default: {
+		static std::map<uint32_t, bool> warn_shown;
+		auto it = warn_shown.find( pname );
+		if ( it == warn_shown.end() )
+		{
+			warn_shown[pname] = true;
+			logPrintf( "WARNING: glGet(0x%x) is not supported\n", pname );
+		}
+		params[0] = (T)0;
+		break; }
 	}
 }
 

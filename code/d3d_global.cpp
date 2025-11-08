@@ -28,7 +28,16 @@
 #include "d3d_extension.hpp"
 #include "d3d_texture.hpp"
 #include "d3d_matrix_stack.hpp"
+#include "d3d_matrix_detection.hpp"
+#include "d3d_helpers.hpp"
+#include "hooking.h"
+#include "rmx_gen.h"
+#include "rmx_light.h"
+#include "resource.h"
 
+#include <tchar.h>
+#include <string.h>
+#include "ini.h"
 //==================================================================================
 // D3D Global
 //----------------------------------------------------------------------------------
@@ -36,6 +45,13 @@
 //==================================================================================
 
 D3DGlobal_t D3DGlobal;
+
+static std::string g_gamename;
+static mINI::INIFile g_inifile(WRAPPER_GL_SHORT_NAME_STRING ".ini");
+static mINI::INIStructure g_iniconf;
+static bool g_iniavailable = false;
+
+static BOOL D3DGlobal_InitializeDirect3D( void );
 
 void D3DGlobal_Init( bool clearGlobals )
 {
@@ -63,6 +79,18 @@ void D3DGlobal_Init( bool clearGlobals )
 		if (!D3DGlobal.defaultTexture[i])
 			D3DGlobal.defaultTexture[i] = new D3DTextureObject(0);
 	}
+
+	if (g_inifile.read(g_iniconf))
+	{
+		g_iniavailable = true;
+	}
+	else
+	{
+		g_iniavailable = false;
+	}
+
+	if (!clearGlobals)
+		matrix_detect_configuration_reset();
 }
 
 void D3DGlobal_Reset()
@@ -97,6 +125,29 @@ void D3DGlobal_Reset()
 void D3DGlobal_Cleanup( bool cleanupAll )
 {
 	logPrintf("--- Cleanup( %s ) ---\n", cleanupAll ? "all" : "partial" );
+
+#ifndef QINDIEGLSRC_NO_REMIX
+	rmx_deinit_device();
+#endif
+
+	if ( D3DGlobal.settings.game.orthovertexshader )
+	{
+		if ( D3DGlobal.orthoShaders.vs )
+		{
+			D3DGlobal.orthoShaders.vs->Release();
+			D3DGlobal.orthoShaders.vs = 0;
+		}
+		if ( D3DGlobal.orthoShaders.ps )
+		{
+			D3DGlobal.orthoShaders.ps->Release();
+			D3DGlobal.orthoShaders.ps = 0;
+		}
+		if ( D3DGlobal.orthoShaders.constants )
+		{
+			D3DGlobal.orthoShaders.constants->Release();
+			D3DGlobal.orthoShaders.constants = 0;
+		}
+	}
 
 	UTIL_FreeString(D3DGlobal.szWExtensions);
 	D3DGlobal.szWExtensions = nullptr;
@@ -138,6 +189,14 @@ void D3DGlobal_Cleanup( bool cleanupAll )
 	if (D3DGlobal.modelviewMatrixStack) {
 		delete D3DGlobal.modelviewMatrixStack;
 		D3DGlobal.modelviewMatrixStack = nullptr;
+	}
+	if (D3DGlobal.modelMatrixStack) {
+		delete D3DGlobal.modelMatrixStack;
+		D3DGlobal.modelMatrixStack = nullptr;
+	}
+	if (D3DGlobal.viewMatrixStack) {
+		delete D3DGlobal.viewMatrixStack;
+		D3DGlobal.viewMatrixStack = nullptr;
 	}
 	if (D3DGlobal.projectionMatrixStack) {
 		delete D3DGlobal.projectionMatrixStack;
@@ -212,13 +271,21 @@ DWORD D3DGlobal_GetRegistryValue( const char *key, const char *section, DWORD de
 	DWORD dwSize = sizeof(DWORD);
 	char szKeyPath[MAX_PATH];
 
+	if (g_iniavailable)
+	{
+		if (g_iniconf.has(section) && g_iniconf[section].has(key))
+		{
+			return strtoul(g_iniconf[section][key].c_str(), NULL, 10);
+		}
+	}
+
 	strncpy_s(szKeyPath, WRAPPER_REGISTRY_PATH "\\", MAX_PATH-1);
 	strncat_s(szKeyPath, section, MAX_PATH-1);
 
-    returnStatus = RegOpenKeyEx(HKEY_CURRENT_USER, szKeyPath, 0L, KEY_READ, &hKey);
+    returnStatus = RegOpenKeyExA(HKEY_CURRENT_USER, szKeyPath, 0L, KEY_READ, &hKey);
 
 	if (returnStatus == ERROR_SUCCESS) {
-		returnStatus = RegQueryValueEx(hKey, key, nullptr, &dwType, (LPBYTE)&dwValue, &dwSize);
+		returnStatus = RegQueryValueExA(hKey, key, nullptr, &dwType, (LPBYTE)&dwValue, &dwSize);
 		if (returnStatus == ERROR_SUCCESS) {
 			RegCloseKey(hKey);
 			return dwValue;
@@ -231,6 +298,93 @@ DWORD D3DGlobal_GetRegistryValue( const char *key, const char *section, DWORD de
 	}
 
 	return defaultValue;
+}
+
+int D3DGlobal_ReadGameConf(const char* valname)
+{
+	int ret = 0;
+	const char* gamename = D3DGlobal_GetGameName();
+	for(int tries = 0; tries < 2; tries++)
+	{
+		if (gamename && g_iniconf.has(gamename) && g_iniconf[gamename].has(valname))
+		{
+			ret = strtoul( g_iniconf[gamename][valname].c_str(), NULL, 10 );
+			break;
+		}
+		else
+		{
+			gamename = GLOBAL_GAMENAME;
+		}
+	}
+	return ret;
+}
+
+void* D3DGlobal_ReadGameConfPtr(const char* valname)
+{
+	void* ret = 0;
+	const char* gamename = D3DGlobal_GetGameName();
+	for(int tries = 0; tries < 2; tries++)
+	{
+		if (gamename && g_iniconf.has(gamename) && g_iniconf[gamename].has(valname))
+		{
+			ret = (void*)strtoul( g_iniconf[gamename][valname].c_str(), NULL, 16 );
+			break;
+		}
+		else
+		{
+			gamename = GLOBAL_GAMENAME;
+		}
+	}
+	return ret;
+}
+
+int D3DGlobal_ReadGameConfStr(const char* valname, char *out, int outsz)
+{
+	int ret = 0;
+	const char* gamename = D3DGlobal_GetGameName();
+	for(int tries = 0; tries < 2; tries++)
+	{
+		if (gamename && g_iniconf.has(gamename) && g_iniconf[gamename].has(valname))
+		{
+			errno_t ercd = strncpy_s(out, outsz, g_iniconf[gamename][valname].c_str(), _TRUNCATE);
+			if ( ercd == STRUNCATE )
+			{
+				logPrintf( "ReadGameConf: string truncation for %s, expected max %d bytes.\n", valname, outsz );
+				return 0;
+			}
+			if ( ercd == 0 )
+			{
+				return 1;
+			}
+		}
+		else
+		{
+			gamename = GLOBAL_GAMENAME;
+		}
+	}
+	return ret;
+}
+
+/*
+==================
+D3DGlobal_GetIniHandler
+
+Returns a pointer to the ini file handler object
+==================
+*/
+void* D3DGlobal_GetIniHandler()
+{
+	return &g_iniconf;
+}
+
+void D3DGlobal_StoreGameName(const char *gn)
+{
+	g_gamename.assign(gn);
+}
+
+const char* D3DGlobal_GetGameName()
+{
+	return g_gamename.c_str();
 }
 
 /*
@@ -551,6 +705,71 @@ static D3DFORMAT D3DGlobal_GetAdapterModeFormat( int width, int height, int bpp 
 	return D3DFMT_UNKNOWN;
 }
 
+extern int D3DGlobal_GetResolutions(resolution_info_t *resolutions, int count)
+{
+	D3DADAPTER_IDENTIFIER9 adapter_info;
+	D3DCAPS9 caps;
+	D3DDISPLAYMODE desktop;
+	D3DDISPLAYMODE* modes;
+	int modes_count = 0;
+	int j = 0;
+
+	const int minwidth = 800;
+	const int minheight = 600;
+
+	if (!D3DGlobal.pD3D) {
+		if ( ! D3DGlobal_InitializeDirect3D() )
+			return 0;
+	}
+
+	//UINT adapter_count = D3DGlobal.pD3D->GetAdapterCount();
+	UINT adapter_num = D3DADAPTER_DEFAULT;
+	D3DGlobal.pD3D->GetAdapterIdentifier( adapter_num, 0, &adapter_info );
+	D3DGlobal.pD3D->GetDeviceCaps( adapter_num, D3DDEVTYPE_HAL, &caps );
+	D3DGlobal.pD3D->GetAdapterDisplayMode( adapter_num, &desktop );
+
+	int nummodes = D3DGlobal.pD3D->GetAdapterModeCount( adapter_num, desktop.Format );
+	modes = (D3DDISPLAYMODE*)malloc( sizeof( D3DDISPLAYMODE ) * (1 + nummodes) ); //todo: use engine alloc functions
+	if ( modes == NULL )
+	{
+		logPrintf( "...Error: cannot alloc memory to enumerate videomodes\n" );
+		return 0;
+	}
+	ZeroMemory( modes, (sizeof( D3DDISPLAYMODE ) * (1 + nummodes)) );
+	D3DDISPLAYMODE* m = modes;
+	for ( int amode = 0; amode < nummodes; amode++ )
+	{
+		D3DDISPLAYMODE dispMode;
+		D3DGlobal.pD3D->EnumAdapterModes( adapter_num, desktop.Format, amode, &dispMode );
+		if ( dispMode.Width < minwidth || dispMode.Height < minheight || dispMode.RefreshRate != desktop.RefreshRate )
+			continue;
+		memcpy( m, &dispMode, sizeof( dispMode ) );
+		modes_count++;
+		m++;
+	}
+	if ( modes_count )
+	{
+		int steps = modes_count;
+		int i = 0;
+		if ( count < modes_count )
+		{
+			steps = count;
+			i = modes_count - count;
+		}
+		for ( j = 0; i < steps; i++, j++ )
+		{
+			snprintf( resolutions[j].display_name, sizeof( resolutions->display_name ), "%d %d%s", modes[i].Width, modes[i].Height, ((float)modes[i].Width / modes[i].Height > 1.4f ? " (WS)" : "") );
+			resolutions[j].width = modes[i].Width;
+			resolutions[j].height = modes[i].Height;
+		}
+
+	}
+
+	free(modes);
+
+	return j;
+}
+
 /*
 ========================
 D3DGlobal_SetupPresentParams
@@ -640,6 +859,77 @@ static bool D3DGlobal_SetupPresentParams( int width, int height, int bpp, BOOL w
 
 #define D3D_CONTEXT_MAGIC	0xBEEF
 
+static BOOL D3DGlobal_InitializeDirect3D( void )
+{
+	if ( nullptr == (D3DGlobal.hD3DDll = LoadLibrary( _T( "d3d9.dll" ) )) ) {
+		logPrintf( "wglCreateContext: failed to load d3d9.dll\n" );
+		return 0;
+	}
+	pfnDirect3DCreate9 d3dCreateFn = (pfnDirect3DCreate9)GetProcAddress( D3DGlobal.hD3DDll, "Direct3DCreate9" );
+	if ( !d3dCreateFn ) {
+		logPrintf( "wglCreateContext: failed to get address of \"Direct3DCreate9\" from d3d9.dll\n" );
+		return 0;
+	}
+
+	D3DGlobal.dbgBeginEvent = (pfnD3DPERF_BeginEvent)GetProcAddress( D3DGlobal.hD3DDll, "D3DPERF_BeginEvent" );
+	if ( !D3DGlobal.dbgBeginEvent ) {
+		logPrintf( "wglCreateContext: failed to get address of \"D3DPERF_BeginEvent\" from d3d9.dll\n" );
+		return 0;
+	}
+	D3DGlobal.dbgEndEvent = (pfnD3DPERF_EndEvent)GetProcAddress( D3DGlobal.hD3DDll, "D3DPERF_EndEvent" );
+	if ( !D3DGlobal.dbgEndEvent ) {
+		logPrintf( "wglCreateContext: failed to get address of \"D3DPERF_EndEvent\" from d3d9.dll\n" );
+		return 0;
+	}
+
+	if ( nullptr == (D3DGlobal.pD3D = d3dCreateFn( D3D_SDK_VERSION )) ) {
+		logPrintf( "wglCreateContext: failed to initialize Direct3D\n" );
+		return 0;
+	}
+	if ( nullptr == D3DGlobal.pD3D ) {
+		logPrintf( "wglCreateContext: Direct3DCreate9 returned NULL\n" );
+		return 0;
+	}
+
+	D3DGlobal.settings.game.remixapi = D3DGlobal_ReadGameConf( "remixapi" );
+	if ( D3DGlobal.settings.game.remixapi )
+	{
+#ifdef QINDIEGLSRC_NO_REMIX
+		logPrintf( "Warn: Remix API will not be initialised because this is the NoRemixMods dll version.\n" );
+#else
+		PFN_remixapi_InitializeLibrary remix_init = (PFN_remixapi_InitializeLibrary)GetProcAddress( D3DGlobal.hD3DDll, "remixapi_InitializeLibrary" );
+		if ( remix_init == NULL )
+		{
+			logPrintf( "Warn: Remix API not found\n" );
+		}
+		else
+		{
+			remixapi_InitializeLibraryInfo info;
+			ZeroMemory( &info, sizeof( info ) );
+			{
+				info.sType = REMIXAPI_STRUCT_TYPE_INITIALIZE_LIBRARY_INFO;
+				info.version = REMIXAPI_VERSION_MAKE( REMIXAPI_VERSION_MAJOR,
+					REMIXAPI_VERSION_MINOR,
+					REMIXAPI_VERSION_PATCH );
+			}
+
+			remixapi_ErrorCode status = remix_init( &info, &remixInterface );
+			if ( status != REMIXAPI_ERROR_CODE_SUCCESS ) {
+				logPrintf( "Warn: Remix API init error %d, did you set 'exposeRemixApi = True' in .trex\\bridge.conf ? \n", status );
+			}
+			else
+			{
+				remixOnline = TRUE;
+			}
+		}
+#endif
+	}
+
+	logPrintf( "Direct3D initialized\n" );
+
+	return 1;
+}
+
 OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 {
 	//logPrintf("wrap_wglCreateContext( %x )\n", hdc);
@@ -659,25 +949,8 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	// initialize direct3d
 	if (!D3DGlobal.pD3D) {
-		if (nullptr == (D3DGlobal.hD3DDll = LoadLibrary("d3d9.dll"))) {
-			logPrintf("wglCreateContext: failed to load d3d9.dll\n");
+		if ( ! D3DGlobal_InitializeDirect3D() )
 			return 0;
-		}
-		pfnDirect3DCreate9 d3dCreateFn = (pfnDirect3DCreate9)GetProcAddress(D3DGlobal.hD3DDll, "Direct3DCreate9");
-		if (!d3dCreateFn) {
-			logPrintf("wglCreateContext: failed to get address of \"Direct3DCreate9\" from d3d9.dll\n");
-			return 0;
-		}
-
-		if (nullptr == (D3DGlobal.pD3D = d3dCreateFn(D3D_SDK_VERSION)) ) {
-			logPrintf("wglCreateContext: failed to initialize Direct3D\n");
-			return 0;
-		}
-		if (nullptr == D3DGlobal.pD3D) {
-			logPrintf("wglCreateContext: Direct3DCreate9 returned NULL\n");
-			return 0;
-		}
-		logPrintf("Direct3D initialized\n");
 	}
 
 	// if a device was previously set up, return TRUE
@@ -689,8 +962,39 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	D3DGlobal.settings.multisample = D3DGlobal_GetRegistryValue( "MultiSample", "Settings", 0 );
 	D3DGlobal.settings.projectionFix = D3DGlobal_GetRegistryValue( "ProjectionFix", "Settings", 0 );
+	D3DGlobal.settings.projectionMaxZFar = D3DGlobal_GetRegistryValue( "ProjectionMaxZFar", "Settings", 0 );
+	D3DGlobal.settings.drawcallFastPath = D3DGlobal_GetRegistryValue( "DrawCallFastPath", "Settings", 0 );
 	D3DGlobal.settings.texcoordFix = D3DGlobal_GetRegistryValue( "TexCoordFix", "Settings", 0 );
 	D3DGlobal.settings.useSSE = D3DGlobal_GetRegistryValue( "UseSSE", "Settings", 0 );
+
+	//Note: remixapi also read in D3DGlobal_InitializeDirect3D above
+	D3DGlobal.settings.game.remixapi = D3DGlobal_ReadGameConf( "remixapi" );
+	D3DGlobal.settings.game.orthovertexshader = D3DGlobal_ReadGameConf( "orthovertexshader" );
+	D3DGlobal.settings.game.orthoskipuntextureddraws = D3DGlobal_ReadGameConf( "orthoskipuntextureddraws" );
+
+	D3DGlobal.normalPtrGuessEnabled = 0;
+	{
+		std::string configname;
+		int i, j;
+		for ( i = 0, j = 0; i < ARRAYSIZE( D3DGlobal.normalPtrGuess ); i++ )
+		{
+			const char* vpname = "dp_VertexPointer";
+			const char* npname = "dp_NormalPointer";
+			D3DGlobal.normalPtrGuess[j].vertexPtr = D3DGlobal_ReadGameConfPtr( configname.assign( vpname ).append( std::to_string( i ) ).c_str() );
+			D3DGlobal.normalPtrGuess[j].normalPtr = D3DGlobal_ReadGameConfPtr( configname.assign( npname ).append( std::to_string( i ) ).c_str() );
+			if ( !!D3DGlobal.normalPtrGuess[j].vertexPtr ^ !!D3DGlobal.normalPtrGuess[j].normalPtr )
+			{
+				logPrintf( "WARNING: dp_VertexPointer%d(%p) or dp_NormalPointer%d(%p) not set, disabling\n", i, D3DGlobal.normalPtrGuess[j].vertexPtr,
+					i, D3DGlobal.normalPtrGuess[j].normalPtr );
+			}
+			else if ( D3DGlobal.normalPtrGuess[j].vertexPtr )
+			{
+				logPrintf( "NormalPtrGuess found pair: %p - %p\n", D3DGlobal.normalPtrGuess[j].vertexPtr, D3DGlobal.normalPtrGuess[j].normalPtr );
+				D3DGlobal.normalPtrGuessEnabled = 1;
+				j++;
+			}
+		}
+	}
 
 	D3DGlobal_CPU_Detect();
 
@@ -742,14 +1046,14 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	if (FAILED(hr = D3DGlobal.pD3D->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &D3DGlobal.hD3DCaps))) {
 		D3DGlobal.lastError = hr;
-		logPrintf("wglCreateContext: GetDeviceCaps failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: GetDeviceCaps failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 
 	// get the format for the desktop mode
 	if (FAILED(hr = D3DGlobal.pD3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &D3DGlobal.hDesktopMode))) {
 		D3DGlobal.lastError = hr;
-		logPrintf("wglCreateContext: GetAdapterDisplayMode failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: GetAdapterDisplayMode failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 
@@ -785,7 +1089,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 									   &D3DGlobal.hPresentParams, &D3DGlobal.pDevice );
 
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString(hr));
 		logPrintf("wglCreateContext: creating device with hardware vertex processing\n");
 	
 		hr = D3DGlobal.pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
@@ -794,14 +1098,14 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 		if (FAILED(hr)) {
 			// it's OK, we may not have hardware vp available, so create a software vp device
-			logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString9(hr));
+			logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString(hr));
 			logPrintf("wglCreateContext: creating device with software vertex processing\n");
 
 			hr = D3DGlobal.pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
 											   D3DCREATE_SOFTWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE | D3DCREATE_DISABLE_DRIVER_MANAGEMENT,
 											   &D3DGlobal.hPresentParams, &D3DGlobal.pDevice );
 			if (FAILED(hr)) {
-				logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString9(hr));
+				logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString(hr));
 				return 0;
 			}
 		}
@@ -814,7 +1118,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	hr = D3DGlobal.pDevice->GetSwapChain( 0, &D3DGlobal.pSwapChain );
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: GetSwapChain failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: GetSwapChain failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 	if (nullptr == D3DGlobal.pSwapChain) {
@@ -829,23 +1133,23 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	D3DSURFACE_DESC hDepthStencilDesc;
 	hr = D3DGlobal.pSwapChain->GetBackBuffer( 0, D3DBACKBUFFER_TYPE_MONO, &lpBackBuffer );
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: GetBackBuffer failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: GetBackBuffer failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 	hr = lpBackBuffer->GetDesc( &hBackBufferDesc );
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: lpBackBuffer->GetDesc failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: lpBackBuffer->GetDesc failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 	lpBackBuffer->Release();
 	hr = D3DGlobal.pDevice->GetDepthStencilSurface( &lpDepthStencil );
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: GetDepthStencilSurface failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: GetDepthStencilSurface failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 	hr = lpDepthStencil->GetDesc( &hDepthStencilDesc );
 	if (FAILED(hr)) {
-		logPrintf("wglCreateContext: lpDepthStencil->GetDesc failed with error '%s'\n", DXGetErrorString9(hr));
+		logPrintf("wglCreateContext: lpDepthStencil->GetDesc failed with error '%s'\n", DXGetErrorString(hr));
 		return 0;
 	}
 	lpDepthStencil->Release();
@@ -876,6 +1180,8 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	//init matrix stacks
 	D3DGlobal.modelviewMatrixStack = new D3DMatrixStack;
+	D3DGlobal.modelMatrixStack = new D3DMatrixStack;
+	D3DGlobal.viewMatrixStack = new D3DMatrixStack;
 	D3DGlobal.projectionMatrixStack = new D3DMatrixStack;
 	for (int i = 0; i < MAX_D3D_TMU; ++i)
 		D3DGlobal.textureMatrixStack[i] = new D3DMatrixStack;
@@ -890,7 +1196,94 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	D3DGlobal.deviceLost = false;
 	D3DGlobal.sceneBegan = false;
 
+#ifndef QINDIEGLSRC_NO_REMIX
+	rmx_init_device( D3DGlobal.hWnd, D3DGlobal.pDevice );
+#endif
+
+	if ( D3DGlobal.settings.game.orthovertexshader )
+	{
+		LPVOID data;
+		UINT size;
+		HRESULT res = 0;
+		bool shaderInitOK = false;
+		do {
+			if ( resource_load_shader( RES_ID_ORTHO_VS, &data, &size, D3DGlobal.hModule ) )
+			{
+				ID3DXBuffer* vertexShaderBuffer;
+
+				res = D3DXCompileShader( (LPCSTR)data, size, NULL, NULL, "main", "vs_2_0", 0, &vertexShaderBuffer, 0, &D3DGlobal.orthoShaders.constants );
+				if ( FAILED( res ) ) break;
+
+				res = D3DGlobal.pDevice->CreateVertexShader( (DWORD*)vertexShaderBuffer->GetBufferPointer(), &D3DGlobal.orthoShaders.vs );
+
+				vertexShaderBuffer->Release();
+				if ( FAILED( res ) ) break;
+			}
+			else break;
+
+			if ( resource_load_shader( RES_ID_ORTHO_PS, &data, &size, D3DGlobal.hModule ) )
+			{
+				ID3DXBuffer* pixelShaderBuffer;
+
+				res = D3DXCompileShader( (LPCSTR)data, size, NULL, NULL, "main", "ps_2_0", 0, &pixelShaderBuffer, 0, 0 );
+				if ( FAILED( res ) ) break;
+
+				res = D3DGlobal.pDevice->CreatePixelShader( (DWORD*)pixelShaderBuffer->GetBufferPointer(), &D3DGlobal.orthoShaders.ps );
+
+				pixelShaderBuffer->Release();
+				if ( FAILED( res ) ) break;
+			}
+			else break;
+
+			shaderInitOK = true;
+		} while ( 0 );
+
+		if ( !shaderInitOK )
+		{
+			D3DGlobal.settings.game.orthovertexshader = 0;
+			logPrintf( "Error: orthovertexshader disabled due to an error at shader init (%x)\n", res );
+
+			if ( D3DGlobal.orthoShaders.vs )
+			{
+				D3DGlobal.orthoShaders.vs->Release();
+				D3DGlobal.orthoShaders.vs = 0;
+			}
+			if ( D3DGlobal.orthoShaders.ps )
+			{
+				D3DGlobal.orthoShaders.ps->Release();
+				D3DGlobal.orthoShaders.ps = 0;
+			}
+			if ( D3DGlobal.orthoShaders.constants )
+			{
+				D3DGlobal.orthoShaders.constants->Release();
+				D3DGlobal.orthoShaders.constants = 0;
+			}
+		}
+		else
+		{
+			logPrintf( "orthovertexshader was initialized\n" );
+		}
+	}
+
 	return D3DGlobal.hGLRC;
+}
+
+bool D3DGlobal_IsOrthoProjection()
+{
+	return D3DGlobal.projectionMatrixStack->top().is_ortho();
+}
+
+void D3DGlobal_GetCamera(D3DXMATRIX *camera)
+{
+	D3DMatrixStack* viewStack = D3DGlobal.viewMatrixStack;
+	if ( viewStack->stack_depth() )
+	{
+		memcpy( camera, *viewStack->top(), sizeof( *camera ) );
+	}
+	else
+	{
+		D3DXMatrixIdentity( camera );
+	}
 }
 
 OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
@@ -1053,8 +1446,16 @@ OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 			}
 		}
 
+#ifndef QINDIEGLSRC_NO_REMIX
+		qdx_imgui_draw();
+#endif
+
 		D3DGlobal.pDevice->EndScene();
 		D3DGlobal.sceneBegan = false;
+
+#ifndef QINDIEGLSRC_NO_REMIX
+		qdx_lights_draw();
+#endif
 
 		HRESULT hr;
 		
@@ -1073,6 +1474,13 @@ OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 				D3DGlobal.lastError = hr;
 			}
 		}
+
+		matrix_detect_frame_ended();
+#ifndef QINDIEGLSRC_NO_REMIX
+		hook_frame_ended();
+#endif
+		//call this last, as it clears they key pressed/released flag
+		keypress_frame_ended();
 	}
 
 	if (D3DGlobal.pVABuffer)
@@ -1091,7 +1499,7 @@ static PIXELFORMATDESCRIPTOR s_d3dPixelFormat =
 	PFD_DOUBLEBUFFER,					// Must Support Double Buffering
 	PFD_TYPE_RGBA,                      // Request An RGBA Format
 	32,									// Select Our Color Depth
-	0, 0, 0, 0, 0, 0,                   // Color Bits Ignored
+	8, 0, 8, 0, 8, 0,                   // Color Bits WG: needed by SDL
 	8,                                  // 8-bit Alpha Buffer
 	0,                                  // Shift Bit Ignored
 	0,                                  // No Accumulation Buffer
@@ -1105,9 +1513,9 @@ static PIXELFORMATDESCRIPTOR s_d3dPixelFormat =
 };
 
 #if 0
-static void DumpPixelFormat( PIXELFORMATDESCRIPTOR *pfd ) 
+static void DumpPixelFormat( CONST PIXELFORMATDESCRIPTOR *pfd, const char *func, HDC hdc, int index ) 
 {
-	logPrintf("DumpPixelFormat: 0x%x\n", pfd);
+	logPrintf("%s: HDC %p index %d\n", func, hdc, index);
 	if (!pfd) return;
 
 	logPrintf(" Size = %i\n", pfd->nSize);
@@ -1126,10 +1534,15 @@ static void DumpPixelFormat( PIXELFORMATDESCRIPTOR *pfd )
 	logPrintf(" Layer Type = %i\n", pfd->iLayerType);
 	logPrintf(" Layer Mask = %i\n", pfd->dwLayerMask);
 }
+#else
+static void DumpPixelFormat( CONST PIXELFORMATDESCRIPTOR*, const char*, HDC, int )
+{
+}
 #endif
 
-OPENGL_API int WINAPI wrap_wglChoosePixelFormat( HDC, PIXELFORMATDESCRIPTOR *pfd ) 
-{ 
+OPENGL_API int WINAPI wrap_wglChoosePixelFormat( HDC hdc, PIXELFORMATDESCRIPTOR *pfd ) 
+{
+	DumpPixelFormat(pfd, "wglChoosePixelFormat", hdc, -1);
 	if ( pfd ) {
 		s_d3dPixelFormat.cColorBits = pfd->cColorBits;
 		D3DGlobal.iBPP = pfd->cColorBits;
@@ -1138,20 +1551,22 @@ OPENGL_API int WINAPI wrap_wglChoosePixelFormat( HDC, PIXELFORMATDESCRIPTOR *pfd
 	return 0;
 }
 
-OPENGL_API int WINAPI wrap_wglDescribePixelFormat( HDC, int, UINT, LPPIXELFORMATDESCRIPTOR pfd ) 
+OPENGL_API int WINAPI wrap_wglDescribePixelFormat( HDC hdc, int index, UINT, LPPIXELFORMATDESCRIPTOR pfd ) 
 { 
+	logPrintf("wglDescribePixelFormat: HDC %p index %d\n", hdc, index);
 	if ( pfd ) memcpy( pfd, &s_d3dPixelFormat, sizeof(s_d3dPixelFormat) );
 	return 1;
 }
 
-OPENGL_API int WINAPI wrap_wglGetPixelFormat( HDC ) 
+OPENGL_API int WINAPI wrap_wglGetPixelFormat( HDC hdc ) 
 { 
+	logPrintf("wglGetPixelFormat: HDC %p\n", hdc);
 	return 1;
 }
 
-OPENGL_API BOOL WINAPI wrap_wglSetPixelFormat( HDC, int, CONST PIXELFORMATDESCRIPTOR* ) 
+OPENGL_API BOOL WINAPI wrap_wglSetPixelFormat( HDC hdc, int index, CONST PIXELFORMATDESCRIPTOR *pfd ) 
 { 
-	// just silently pass the PFD through unmodified
+	DumpPixelFormat(pfd, "wglSetPixelFormat", hdc, index);
 	return TRUE;
 }
 
@@ -1192,7 +1607,7 @@ OPENGL_API BOOL WINAPI wrap_wglSwapLayerBuffers( HDC, UINT )
 
 OPENGL_API BOOL WINAPI wrap_wglShareLists( HGLRC, HGLRC )
 {
-	return TRUE;
+	return FALSE;
 }
 OPENGL_API BOOL WINAPI wrap_wglUseFontBitmapsA( HDC, DWORD, DWORD, DWORD )
 {
@@ -1224,4 +1639,13 @@ OPENGL_API BOOL WINAPI wglSwapInterval( int interval )
 OPENGL_API int WINAPI wglGetSwapInterval()
 {
 	return (D3DGlobal.vSync ? 1 : 0);
+}
+
+OPENGL_API void WINAPI glPNTrianglesiATI( GLenum pname, GLint param )
+{
+	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
+}
+OPENGL_API void WINAPI glPNTrianglesfATI( GLenum pname, GLfloat param )
+{
+	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
 }

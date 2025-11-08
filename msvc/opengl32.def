@@ -208,11 +208,13 @@ EXPORTS
 	glPolygonStipple 
 	glPopAttrib 
 	glPopClientAttrib 
+	glPopDebugGroup
 	glPopMatrix 
 	glPopName 
 	glPrioritizeTextures 
 	glPushAttrib 
 	glPushClientAttrib 
+	glPushDebugGroup
 	glPushMatrix
 	glPushName 
 	glRasterPos2d 
@@ -363,3 +365,6 @@ EXPORTS
 	wglUseFontBitmapsW = wrap_wglUseFontBitmapsW
 	wglUseFontOutlinesA = wrap_wglUseFontOutlinesA
 	wglUseFontOutlinesW = wrap_wglUseFontOutlinesW
+	matrix_print_s
+	DXGetErrorStringA
+	logPrintf

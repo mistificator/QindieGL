@@ -38,8 +38,8 @@ OPENGL_API const char* WINAPI wglGetExtensionsStringARB( HDC )
 
 typedef struct glext_entry_point_s
 {
-	char *name;
-	char *extname;
+	const char *name;
+	const char *extname;
 	int  enabled;
 	PROC func;
 } glext_entry_point_t;
@@ -169,6 +169,10 @@ static glext_entry_point_t glext_EntryPoints[] =
 
 	//GL_EXT_stencil_two_side
 	GL_EXT_ENTRY_POINT( "EXT", "stencil_two_side", glActiveStencilFace, -1 ),
+
+	//GL_ATI_pn_triangles
+	{ "glPNTrianglesiATI", "GL_ATI_pn_triangles", -1, (PROC)glPNTrianglesiATI },
+	{ "glPNTrianglesfATI", "GL_ATI_pn_triangles", -1, (PROC)glPNTrianglesfATI },
 
 	//WGL_EXT_swap_control
 	WGL_EXT_ENTRY_POINT( "EXT", "swap_control", wglSwapInterval, -2 ),
@@ -352,6 +356,9 @@ void D3DExtension_BuildExtensionsString()
 	//an alias to GL_EXT_multi_draw_arrays
 	ExtensionBuf.AddExtension( "GL_SUN_multi_draw_arrays" );
 
+	//for idtech3 games that pass normal pointer when this is present
+	ExtensionBuf.AddExtension( "GL_ATI_pn_triangles" );
+
 	//we implement it at driver level
 	ExtensionBuf.AddExtension( "WGL_ARB_extensions_string" );
 	ExtensionBuf.AddExtension( "WGL_EXT_swap_control" );
@@ -371,7 +378,8 @@ void D3DExtension_BuildExtensionsString()
 //=========================================
 OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 {
-	static size_t stubAddress = 0xBAD00000;
+	// WG: some games check for this being NULL, and crash
+	static size_t stubAddress = NULL;// 0xBAD00000;
 	const char *pszDisabledExt = NULL;
 
 	for (int i = 0; ; ++i) {
@@ -393,15 +401,21 @@ OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 		}
 	}
 
-	if (PROC directNamedFuncHandle = GetProcAddress(GetModuleHandle("opengl32.dll"), s))
-		return directNamedFuncHandle;
-
-	++stubAddress;
-
 	if (pszDisabledExt)
 		logPrintf("WARNING: wglGetProcAddress: queried disabled proc '%s' (extension '%s') (stub = 0x%X)\n", s, pszDisabledExt, stubAddress);
 	else
-		logPrintf("WARNING: wglGetProcAddress: queried unknown proc '%s' (stub = 0x%X)\n", s, stubAddress);
+	{
+		FARPROC fp = GetProcAddress(D3DGlobal.hModule, s);
+		if (fp)
+		{
+			logPrintf("wglGetProcAddress: queried proc '%s'\n", s);
+			return fp;
+		}
+		else
+		{
+			logPrintf("WARNING: wglGetProcAddress: queried unknown proc '%s' (stub = 0x%X)\n", s, stubAddress);
+		}
+	}
 
 	return (PROC)stubAddress;
 }

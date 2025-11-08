@@ -27,7 +27,9 @@ typedef void (*pfnTrNormal)( const GLfloat *normal, float *output );
 
 typedef struct D3DState_s
 {
-	D3DVIEWPORT9		viewport;	
+	D3DVIEWPORT9		viewport;
+	int                 viewport_offX;
+	int                 viewport_offY;
 	D3DMatrixStack*		currentMatrixStack;
 	bool				modelViewMatrixModified;
 	bool				projectionMatrixModified;
@@ -53,6 +55,16 @@ typedef struct D3DState_s
 		DWORD			currentColor2;
 		FLOAT			currentNormal[3];
 		FLOAT			currentTexCoord[MAX_D3D_TMU][4];
+		union {
+			struct {
+				DWORD       color : 1;
+				DWORD       color2 : 1;
+				DWORD       norm : 1;
+				DWORD       fog : 1;
+				DWORD       texcoord : 16;
+			} bits;
+			DWORD           all;
+		}               isSet;
 	} CurrentState;
 	struct {
 		DWORD			depthTestFunc;
@@ -151,6 +163,7 @@ typedef struct D3DState_s
 		DWORD			textureEnvModeChanged[MAX_D3D_TMU];
 		DWORD			textureEnvColor;
 		DWORD			textureReference;
+		DWORD			transformEnabled;
 		struct {
 			GLenum		mode;
 			FLOAT		objectPlane[4];
@@ -257,5 +270,8 @@ extern void D3DState_SetCullMode();
 extern void D3DState_SetDepthBias();
 extern void D3DState_AssureBeginScene();
 extern void D3DState_Check();
+
+extern OPENGL_API void WINAPI glEnableClientState( GLenum cap );
+extern OPENGL_API void WINAPI glDisableClientState( GLenum cap );
 
 #endif //QINDIEGL_D3D_STATE_H
