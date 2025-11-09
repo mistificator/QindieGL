@@ -1107,6 +1107,8 @@ HRESULT D3DPixels_Pack( int width, int height, int depth, int hpitch, int vpitch
 
 OPENGL_API void WINAPI glReadPixels( GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if(!D3DGlobal.pDevice) {
 		D3DGlobal.lastError = E_FAIL;
 		return;
@@ -1336,6 +1338,8 @@ OPENGL_API void WINAPI glDrawPixels( GLsizei, GLsizei, GLenum, GLenum, const GLv
 
 OPENGL_API void WINAPI glGetPixelMapfv( GLenum map, GLfloat *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD mapSize;
 
@@ -1367,6 +1371,8 @@ OPENGL_API void WINAPI glGetPixelMapfv( GLenum map, GLfloat *values )
 
 OPENGL_API void WINAPI glGetPixelMapuiv( GLenum map, GLuint *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD mapSize;
 
@@ -1398,6 +1404,8 @@ OPENGL_API void WINAPI glGetPixelMapuiv( GLenum map, GLuint *values )
 }
 OPENGL_API void WINAPI glGetPixelMapusv( GLenum map, GLushort *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD mapSize;
 
@@ -1430,6 +1438,8 @@ OPENGL_API void WINAPI glGetPixelMapusv( GLenum map, GLushort *values )
 
 OPENGL_API void WINAPI glPixelMapfv( GLenum map, GLsizei mapsize, const GLfloat *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
 
@@ -1467,6 +1477,8 @@ OPENGL_API void WINAPI glPixelMapfv( GLenum map, GLsizei mapsize, const GLfloat 
 
 OPENGL_API void WINAPI glPixelMapuiv( GLenum map, GLsizei mapsize, const GLuint *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
 
@@ -1505,6 +1517,8 @@ OPENGL_API void WINAPI glPixelMapuiv( GLenum map, GLsizei mapsize, const GLuint 
 
 OPENGL_API void WINAPI glPixelMapusv( GLenum map, GLsizei mapsize, const GLushort *values )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
 
@@ -1543,6 +1557,8 @@ OPENGL_API void WINAPI glPixelMapusv( GLenum map, GLsizei mapsize, const GLushor
 
 OPENGL_API void WINAPI glPixelStorei( GLenum pname, GLint param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch(pname) {
 	case GL_UNPACK_SWAP_BYTES:
 		D3DState.ClientPixelStoreState.unpackSwapBytes =(param > 0) ? GL_TRUE : GL_FALSE;
@@ -1615,6 +1631,8 @@ OPENGL_API void WINAPI glPixelStoref( GLenum pname, GLfloat param )
 
 OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch(pname) {
 	case GL_MAP_COLOR:
 		D3DState.ClientPixelStoreState.transferMapColor =(param > 0) ? GL_TRUE : GL_FALSE;
@@ -1660,6 +1678,8 @@ OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 }
 OPENGL_API void WINAPI glPixelTransferf( GLenum pname, GLfloat param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch(pname) {
 	case GL_MAP_COLOR:
 		D3DState.ClientPixelStoreState.transferMapColor =(param > 0) ? GL_TRUE : GL_FALSE;

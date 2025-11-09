@@ -41,17 +41,23 @@ static void TrVertexFunc_Copy( const GLfloat *vertex, float *output )
 
 static void TrVertexFunc_TransformByModelview( const GLfloat *vertex, float *output )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DXVec3TransformCoord((D3DXVECTOR3*)output, (D3DXVECTOR3*)vertex, D3DGlobal.modelviewMatrixStack->top());
 }
 
 static void TrVertexFunc_TransformByModelviewAndNormalize( const GLfloat *vertex, float *output )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DXVec3TransformCoord((D3DXVECTOR3*)output, (D3DXVECTOR3*)vertex, D3DGlobal.modelviewMatrixStack->top());
 	D3DXVec3Normalize((D3DXVECTOR3*)output, (D3DXVECTOR3*)output);
 }
 
 static void TrNormalFunc_TransformByModelview( const GLfloat *normal, float *output )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DXVec3TransformNormal((D3DXVECTOR3*)output, (D3DXVECTOR3*)normal, D3DGlobal.modelviewMatrixStack->top().invtrans());
 }
 
@@ -278,6 +284,8 @@ static void TexGenFunc_NormalMap( int /*stage*/, int coord, const GLfloat* /*ver
 
 void SelectTexGenFunc( int stage, int coord )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch (D3DState.TextureState.TexGen[stage][coord].mode) {
 	case GL_OBJECT_LINEAR:
 		D3DState.TextureState.TexGen[stage][coord].func = (D3DGlobal.settings.useSSE ? TexGenFunc_ObjectLinear_SSE : TexGenFunc_ObjectLinear);
@@ -315,6 +323,8 @@ void SelectTexGenFunc( int stage, int coord )
 template<typename T>
 static void SetupTexGen( int stage, int coord, GLenum pname, const T *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch (pname) {
 	case GL_TEXTURE_GEN_MODE:
 		D3DState.TextureState.TexGen[stage][coord].mode = (GLenum)params[0];

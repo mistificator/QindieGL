@@ -160,13 +160,19 @@ BOOL APIENTRY DllMain( HMODULE hModule, DWORD ul_reason_for_call, LPVOID )
 				ercd = GetModuleFileName(hModule, dllname, PATH_SZ);
 			}
 			D3DGlobal_StoreGameName(game_cfg.c_str());
-			D3DGlobal_Init( true );
-			D3DGlobal.hModule = hModule;
+			for ( size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+			{
+				D3DGlobal_Init( & D3DGlobals[contextIndex], true );
+				D3DGlobals[contextIndex].hModule = hModule;
+			}
 			hook_do_init(exename, dllname, game_cfg.c_str());
 			break;
 		case DLL_PROCESS_DETACH:
 			//logPrintf("DllMain( DLL_PROCESS_DETACH )\n");
-			D3DGlobal_Cleanup( true );
+			for ( size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+			{
+				D3DGlobal_Cleanup( & D3DGlobals[contextIndex], true );
+			}
 			hook_do_deinit();
 			logShutdown();
 			break;

@@ -129,6 +129,8 @@ static void D3DState_Copy( const D3DState_t *src, D3DState_t *dst, GLbitfield ma
 
 void D3DState_SetCullMode()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.pDevice) return;
 	HRESULT hr = S_OK;
 
@@ -145,6 +147,8 @@ void D3DState_SetCullMode()
 
 void D3DState_SetDepthBias()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.pDevice) return;
 	HRESULT hr = S_OK;
 
@@ -161,6 +165,8 @@ void D3DState_SetDepthBias()
 
 bool D3DState_SetMatrixMode()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch ( D3DState.TransformState.matrixMode ) {
 		case GL_MODELVIEW:
 			D3DState.currentMatrixStack = D3DGlobal.modelviewMatrixStack;
@@ -181,6 +187,8 @@ bool D3DState_SetMatrixMode()
 
 void D3DState_AssureBeginScene()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.sceneBegan) {
 		HRESULT hr = D3DGlobal.pDevice->BeginScene();
 		if (FAILED(hr)) {
@@ -193,6 +201,8 @@ void D3DState_AssureBeginScene()
 
 static void D3DState_SetTransform()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	HRESULT hr;
 	assert( D3DGlobal.pD3D != nullptr );
 	assert( D3DGlobal.pDevice != nullptr );
@@ -283,6 +293,8 @@ static void D3DState_SetTransform()
 
 static void D3DState_SetLight()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DState.EnableState.lightingEnabled)
 		return;
 
@@ -344,6 +356,8 @@ static void D3DState_SetLight()
 
 static void D3DState_SetTextureEnvCombine( int stage, int sampler )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	const DWORD colorOp = UTIL_GLtoD3DTextureCombineOp( D3DState.TextureState.TextureCombineState[stage].colorOp, D3DState.TextureState.TextureCombineState[stage].colorScale );
 	const DWORD alphaOp = UTIL_GLtoD3DTextureCombineOp( D3DState.TextureState.TextureCombineState[stage].alphaOp, D3DState.TextureState.TextureCombineState[stage].alphaScale );
 
@@ -377,6 +391,8 @@ static void D3DState_SetTextureEnvCombine( int stage, int sampler )
 
 static void D3DState_SetTextureEnv( int stage, int sampler, eTexTypeInternal intformat )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 //	logPrintf("Stage %i, sampler %i: MODE 0x%x\n", stage, sampler, D3DState.TextureState.textureEnvMode[stage]);
 
 	switch (D3DState.TextureState.TextureCombineState[stage].envMode) {
@@ -450,6 +466,8 @@ static void D3DState_SetTextureEnv( int stage, int sampler, eTexTypeInternal int
 
 void D3DState_SetTexture()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DState.TextureState.textureSamplerStateChanged)
 		return;
 
@@ -601,6 +619,8 @@ void D3DState_Check()
 
 void D3DState_Apply( GLbitfield mask )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (mask & GL_COLOR_BUFFER_BIT) {
 		D3DGlobal.pDevice->SetRenderState(D3DRS_ALPHAFUNC, D3DState.ColorBufferState.alphaTestFunc);
 		D3DGlobal.pDevice->SetRenderState(D3DRS_ALPHAREF, D3DState.ColorBufferState.alphaTestReference);
@@ -707,6 +727,8 @@ void D3DState_Apply( GLbitfield mask )
 
 void D3DState_SetDefaults()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pD3D != nullptr );
 	assert( D3DGlobal.pDevice != nullptr );
 
@@ -934,6 +956,8 @@ OPENGL_API void WINAPI glPushClientAttrib( GLbitfield mask )
 
 OPENGL_API void WINAPI glPopAttrib()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DStateCopyMask) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
 		return;
@@ -960,6 +984,8 @@ OPENGL_API void WINAPI glPopAttrib()
 
 OPENGL_API void WINAPI glPopClientAttrib()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DStateClientCopyMask) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
 		return;
@@ -971,6 +997,8 @@ OPENGL_API void WINAPI glPopClientAttrib()
 
 static DWORD D3DState_IsEnabledState( GLenum cap )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch (cap) {
 	case GL_ALPHA_TEST:
 		return D3DState.EnableState.alphaTestEnabled;
@@ -1085,6 +1113,8 @@ static DWORD D3DState_IsEnabledState( GLenum cap )
 
 static void D3DState_EnableDisableState( GLenum cap, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch (cap) {
 	case GL_ALPHA_TEST:
 		D3DState.EnableState.alphaTestEnabled = value;
@@ -1335,6 +1365,8 @@ static inline void D3DState_ChangeVertexArrayStateBit( DWORD bit, DWORD value )
 
 static void D3DState_EnableDisableClientState( GLenum cap, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch (cap) {
 	case GL_VERTEX_ARRAY:
 		D3DState_ChangeVertexArrayStateBit( VA_ENABLE_VERTEX_BIT, value );
@@ -1391,6 +1423,8 @@ OPENGL_API void WINAPI glDisableClientState( GLenum cap )
 
 OPENGL_API void WINAPI glHint(GLenum target,  GLenum mode)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch( target )
 	{ 
 	case GL_PERSPECTIVE_CORRECTION_HINT:

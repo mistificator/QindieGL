@@ -30,6 +30,8 @@
 
 OPENGL_API void WINAPI glClear( GLbitfield mask )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.initialized) {
 		D3DGlobal.lastError = E_FAIL;
 		return;
@@ -110,6 +112,8 @@ OPENGL_API void WINAPI glDepthMask( GLboolean flag )
 }
 OPENGL_API void WINAPI glDepthRange( GLclampd zNear, GLclampd zFar )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DState.viewport.MinZ = (float)zNear;
 	D3DState.viewport.MaxZ = (float)zFar;
 	if (!D3DGlobal.initialized) {
@@ -196,6 +200,8 @@ OPENGL_API void WINAPI glShadeModel( GLenum mode )
 }
 OPENGL_API void WINAPI glPointSize( GLfloat size )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	size = QINDIEGL_MAX( QINDIEGL_MIN( size, D3DGlobal.hD3DCaps.MaxPointSize ), 1.0f );
 	if (D3DState.PointState.pointSize != size) {
 		D3DState.PointState.pointSize = size;
@@ -217,6 +223,8 @@ OPENGL_API void WINAPI glFinish()
 }
 OPENGL_API void WINAPI glViewport( GLint x, GLint y, GLsizei width, GLsizei height )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// translate from OpenGL bottom-left to D3D top-left
 	y = D3DGlobal.hCurrentMode.Height - (height + y);
 
@@ -281,6 +289,8 @@ OPENGL_API void WINAPI glViewport( GLint x, GLint y, GLsizei width, GLsizei heig
 }
 OPENGL_API void WINAPI glScissor( GLint x, GLint y, GLsizei width, GLsizei height )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// translate from OpenGL bottom-left to D3D top-left
 	y = D3DGlobal.hCurrentMode.Height - (height + y);
 
@@ -305,6 +315,8 @@ OPENGL_API void WINAPI glPushDebugGroup( GLenum source, GLuint id, GLsizei lengt
 {
 	_CRT_UNUSED( source ); _CRT_UNUSED( length );
 
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	static WCHAR wmessage[2048];
 	if ( D3DGlobal.dbgBeginEvent )
 	{
@@ -315,6 +327,8 @@ OPENGL_API void WINAPI glPushDebugGroup( GLenum source, GLuint id, GLsizei lengt
 }
 OPENGL_API void WINAPI glPopDebugGroup( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( D3DGlobal.dbgEndEvent )
 		D3DGlobal.dbgEndEvent();
 }

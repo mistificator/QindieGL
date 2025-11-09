@@ -33,6 +33,8 @@
 
 OPENGL_API const char* WINAPI wglGetExtensionsStringARB( HDC )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.szWExtensions;
 }
 
@@ -221,6 +223,8 @@ private:
 
 void D3DExtension_BuildExtensionsString()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pD3D != NULL );
 	assert( D3DGlobal.pDevice != NULL );
 
@@ -378,6 +382,8 @@ void D3DExtension_BuildExtensionsString()
 //=========================================
 OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// WG: some games check for this being NULL, and crash
 	static size_t stubAddress = NULL;// 0xBAD00000;
 	const char *pszDisabledExt = NULL;

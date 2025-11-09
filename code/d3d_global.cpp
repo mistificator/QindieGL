@@ -44,7 +44,8 @@
 // Initialize and set up global D3D vars
 //==================================================================================
 
-D3DGlobal_t D3DGlobal;
+D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT] = { 0 };
+D3DGlobal_t * D3DGlobalPtr = & D3DGlobals[0];
 
 static std::string g_gamename;
 static mINI::INIFile g_inifile(WRAPPER_GL_SHORT_NAME_STRING ".ini");
@@ -53,10 +54,11 @@ static bool g_iniavailable = false;
 
 static BOOL D3DGlobal_InitializeDirect3D( void );
 
-void D3DGlobal_Init( bool clearGlobals )
+void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals )
 {
 	logPrintf("--- Init( %s ) ---\n", clearGlobals ? "clear globals" : "normal" );
 
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtrLocal;
 	if (clearGlobals) {
 		memset( &D3DGlobal, 0, sizeof(D3DGlobal) );
 	} else {
@@ -93,8 +95,10 @@ void D3DGlobal_Init( bool clearGlobals )
 		matrix_detect_configuration_reset();
 }
 
-void D3DGlobal_Reset()
+void D3DGlobal_Reset( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DGlobal.skipCopyImage = 5;
 
 	if (D3DGlobal.pIMBuffer) {
@@ -122,9 +126,11 @@ void D3DGlobal_Reset()
 	D3DGlobal.pVABuffer = new D3DVABuffer;
 }
 
-void D3DGlobal_Cleanup( bool cleanupAll )
+void D3DGlobal_Cleanup( D3DGlobal_t * D3DGlobalPtrLocal, bool cleanupAll )
 {
 	logPrintf("--- Cleanup( %s ) ---\n", cleanupAll ? "all" : "partial" );
+
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtrLocal;
 
 #ifndef QINDIEGLSRC_NO_REMIX
 	rmx_deinit_device();
@@ -475,6 +481,8 @@ They may be queried with glGet
 */
 static void D3DGlobal_SetupPixelFormatBits( D3DFORMAT fmtColor, D3DFORMAT fmtDepth )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	switch( fmtColor )
     {
     case D3DFMT_R8G8B8:			D3DGlobal.rgbaBits[0] = 8; D3DGlobal.rgbaBits[1] = 8; D3DGlobal.rgbaBits[2] = 8; D3DGlobal.rgbaBits[3] = 0; break;
@@ -526,6 +534,8 @@ Gets a valid depth format for a given adapter format
 */
 static D3DFORMAT D3DGlobal_GetDepthFormat( D3DFORMAT AdapterFormat )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// valid depth formats
 	// first try to create formats with depthstencil buffer, then depth-only
 	const D3DFORMAT d3d_DepthFormats[] = {D3DFMT_D24S8, D3DFMT_D24X4S4, D3DFMT_D32, D3DFMT_D24X8, D3DFMT_D16, D3DFMT_UNKNOWN};
@@ -558,6 +568,8 @@ Gets a valid alpha format for a given adapter format
 */
 static D3DFORMAT D3DGlobal_GetAlphaFormat( D3DFORMAT AdapterFormat )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// valid depth formats
 	// first try to create formats with depthstencil buffer, then depth-only
 	const D3DFORMAT d3d_ColorFormats[] = {D3DFMT_A8R8G8B8, D3DFMT_A4R4G4B4, D3DFMT_UNKNOWN};
@@ -591,6 +603,8 @@ Ensures that a given texture format will be available
 */
 BOOL D3DGlobal_CheckTextureFormat( D3DFORMAT TextureFormat, D3DFORMAT AdapterFormat )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	HRESULT hr = D3DGlobal.pD3D->CheckDeviceFormat(	D3DADAPTER_DEFAULT,	D3DDEVTYPE_HAL,	AdapterFormat, 0, D3DRTYPE_TEXTURE,	TextureFormat );
 	logPrintf("CheckTextureFormat: format %s is %ssupported\n", D3DGlobal_FormatToString(TextureFormat), FAILED(hr) ? "not " : "");
 	return SUCCEEDED(hr);
@@ -605,6 +619,8 @@ Ensures that multisample type is available
 */
 BOOL D3DGlobal_CheckMultisampleType( D3DFORMAT BackBufferFormat, D3DFORMAT DepthBufferFormat, int numSamples, DWORD *pQuality )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( SUCCEEDED(D3DGlobal.pD3D->CheckDeviceMultiSampleType( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, BackBufferFormat, FALSE, (D3DMULTISAMPLE_TYPE)numSamples, pQuality ) ) &&
 		SUCCEEDED(D3DGlobal.pD3D->CheckDeviceMultiSampleType( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, DepthBufferFormat, FALSE, (D3DMULTISAMPLE_TYPE)numSamples, pQuality ) ) )
 	{
@@ -624,6 +640,8 @@ returns a usable adapter mode for the given width, height and bpp
 */
 static D3DFORMAT D3DGlobal_GetAdapterModeFormat( int width, int height, int bpp )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// fill these in depending on bpp
 	D3DFORMAT d3d_Formats[3];
 
@@ -707,6 +725,8 @@ static D3DFORMAT D3DGlobal_GetAdapterModeFormat( int width, int height, int bpp 
 
 extern int D3DGlobal_GetResolutions(resolution_info_t *resolutions, int count)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DADAPTER_IDENTIFIER9 adapter_info;
 	D3DCAPS9 caps;
 	D3DDISPLAYMODE desktop;
@@ -779,6 +799,8 @@ Initialize present parameters with a valid adapter mode
 */
 static bool D3DGlobal_SetupPresentParams( int width, int height, int bpp, BOOL windowed )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// clear present params to NULL
 	memset (&D3DGlobal.hPresentParams, 0, sizeof (D3DPRESENT_PARAMETERS));
 
@@ -859,8 +881,15 @@ static bool D3DGlobal_SetupPresentParams( int width, int height, int bpp, BOOL w
 
 #define D3D_CONTEXT_MAGIC	0xBEEF
 
+size_t D3DContexIndex( HGLRC hglrc )
+{
+	return hglrc - (HGLRC)D3D_CONTEXT_MAGIC;
+}
+
 static BOOL D3DGlobal_InitializeDirect3D( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( nullptr == (D3DGlobal.hD3DDll = LoadLibrary( _T( "d3d9.dll" ) )) ) {
 		logPrintf( "wglCreateContext: failed to load d3d9.dll\n" );
 		return 0;
@@ -934,11 +963,21 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 {
 	//logPrintf("wrap_wglCreateContext( %x )\n", hdc);
 
-	if (D3DGlobal.hGLRC)	//don't create multiple contexts
+	size_t contextIndex = 0; 
+	for ( ; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+	{
+		if ( !D3DGlobals[contextIndex].hGLRC )
+		{
+			break;
+		}
+	}
+	if ( contextIndex == D3D_CONTEXTS_COUNT )	//don't create multiple contexts
 	{
 		logPrintf("wglCreateContext: attempt to create additional context, ignored\n");
 		return 0;
 	}
+
+	D3DGlobal_t & D3DGlobal = D3DGlobals[contextIndex];
 
 	D3DGlobal.hDC = hdc;
 	D3DGlobal.hWnd = WindowFromDC(hdc);
@@ -957,8 +996,8 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	if (D3DGlobal.pDevice) 
 		return D3DGlobal.hGLRC;
 
-	D3DGlobal_Cleanup( false );
-	D3DGlobal_Init( false );
+	D3DGlobal_Cleanup( &D3DGlobal, false );
+	D3DGlobal_Init( &D3DGlobal, false );
 
 	D3DGlobal.settings.multisample = D3DGlobal_GetRegistryValue( "MultiSample", "Settings", 0 );
 	D3DGlobal.settings.projectionFix = D3DGlobal_GetRegistryValue( "ProjectionFix", "Settings", 0 );
@@ -998,7 +1037,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	D3DGlobal_CPU_Detect();
 
-	D3DGlobal.hGLRC = (HGLRC)D3D_CONTEXT_MAGIC;
+	D3DGlobal.hGLRC = (HGLRC)D3D_CONTEXT_MAGIC + contextIndex;
 
 	RECT clientrect;
 	LONG winstyle;
@@ -1270,11 +1309,15 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 bool D3DGlobal_IsOrthoProjection()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.projectionMatrixStack->top().is_ortho();
 }
 
 void D3DGlobal_GetCamera(D3DXMATRIX *camera)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DMatrixStack* viewStack = D3DGlobal.viewMatrixStack;
 	if ( viewStack->stack_depth() )
 	{
@@ -1288,10 +1331,14 @@ void D3DGlobal_GetCamera(D3DXMATRIX *camera)
 
 OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
 {
-	if (!D3DGlobal.hGLRC && ((HGLRC)D3D_CONTEXT_MAGIC == hglrc)) {
+	const size_t contextIndex = D3DContexIndex( hglrc );
+	
+	if (contextIndex >= D3D_CONTEXTS_COUNT || !D3DGlobals[contextIndex].hGLRC) {
 		logPrintf("wglDeleteContext: called twice, skipping second call\n");
 		return FALSE;
 	}
+
+	D3DGlobal_t & D3DGlobal = D3DGlobals[contextIndex]; // hide global variable
 
 	if ( hglrc != D3DGlobal.hGLRC ) {
 		logPrintf("wglDeleteContext: attempt to delete additional context (0x%x), ignored\n", hglrc);
@@ -1301,7 +1348,7 @@ OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
 	logPrintf("wglDeleteContext: deleting rendering context\n");
 
 	D3DGlobal.hGLRC = (HGLRC)0;
-	D3DGlobal_Cleanup( false );
+	D3DGlobal_Cleanup( & D3DGlobal, false );
 
 	// success
 	return TRUE;
@@ -1309,11 +1356,15 @@ OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
 
 OPENGL_API HGLRC WINAPI wrap_wglGetCurrentContext()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.hGLRC;
 }
 
 OPENGL_API HDC WINAPI wrap_wglGetCurrentDC()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.hDC;
 }
 
@@ -1321,7 +1372,13 @@ OPENGL_API BOOL WINAPI wrap_wglMakeCurrent(HDC hdc, HGLRC hglrc)
 {
 	//logPrintf("wrap_wglMakeCurrent( %x, %x )\n", hdc, hglrc);
 
-	if (hglrc != nullptr && hdc != nullptr) {
+	const size_t contextIndex = D3DContexIndex( hglrc );
+
+	if (contextIndex < D3D_CONTEXTS_COUNT && hdc != nullptr) {
+
+		D3DGlobalPtr = & D3DGlobals[contextIndex];
+		D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 		if (!D3DGlobal.pDevice)
 			return FALSE;
 
@@ -1379,6 +1436,8 @@ OPENGL_API BOOL WINAPI wrap_wglMakeCurrent(HDC hdc, HGLRC hglrc)
 
 OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.hGLRC)
 		return FALSE;
 
@@ -1542,6 +1601,8 @@ static void DumpPixelFormat( CONST PIXELFORMATDESCRIPTOR*, const char*, HDC, int
 
 OPENGL_API int WINAPI wrap_wglChoosePixelFormat( HDC hdc, PIXELFORMATDESCRIPTOR *pfd ) 
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	DumpPixelFormat(pfd, "wglChoosePixelFormat", hdc, -1);
 	if ( pfd ) {
 		s_d3dPixelFormat.cColorBits = pfd->cColorBits;
@@ -1633,11 +1694,15 @@ OPENGL_API BOOL WINAPI wrap_wglUseFontOutlinesW( HDC, DWORD, DWORD, DWORD, FLOAT
 
 OPENGL_API BOOL WINAPI wglSwapInterval( int interval )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DGlobal.vSync = (interval > 0);
 	return TRUE;
 }
 OPENGL_API int WINAPI wglGetSwapInterval()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return (D3DGlobal.vSync ? 1 : 0);
 }
 

@@ -191,10 +191,12 @@ typedef struct D3DGlobal_s
 
 #define GLOBAL_GAMENAME "game.global"
 
-extern D3DGlobal_t D3DGlobal;
+#define D3D_CONTEXTS_COUNT 8
+extern D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT];
+extern D3DGlobal_t * D3DGlobalPtr;
 
-extern void D3DGlobal_Init( bool clearGlobals );
-extern void D3DGlobal_Cleanup( bool cleanupAll );
+extern void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals );
+extern void D3DGlobal_Cleanup( D3DGlobal_t * D3DGlobalPtrLocal, bool cleanupAll );
 extern const char* D3DGlobal_FormatToString( D3DFORMAT format );
 extern DWORD D3DGlobal_GetRegistryValue( const char *key, const char *section, DWORD defaultValue );
 extern void* D3DGlobal_GetIniHandler();

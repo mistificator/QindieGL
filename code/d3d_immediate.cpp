@@ -61,6 +61,8 @@ void D3DIMBuffer :: EnsureBufferSize( int numVerts )
 
 UINT D3DIMBuffer :: ReorderBufferToFVF( int fvf, int fvfsz )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	const D3DIMBufferVertex *src = m_pBuffer;
 	float *dst = nullptr;
 	HRESULT hr;
@@ -140,6 +142,8 @@ void D3DIMBuffer :: Begin( GLenum primType )
 
 void D3DIMBuffer :: End( )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( !m_vertexCount || !m_bBegan ) 
 		return;
 
@@ -327,6 +331,8 @@ void D3DIMBuffer :: SetupTexCoords( D3DIMBufferVertex *pVertex, int stage )
 
 void D3DIMBuffer :: AddVertex( float x, float y, float z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( !m_bBegan ) return;
 
 	//if we finalize a quad, add two additional vertices so we will
@@ -362,6 +368,8 @@ void D3DIMBuffer :: AddVertex( float x, float y, float z )
 
 void D3DIMBuffer :: AddVertex( float x, float y, float z, float w )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( !m_bBegan ) return;
 
 	//if we finalize a quad, add two additional vertices so we will
@@ -530,6 +538,8 @@ inline void D3D_SetNormal( GLdouble x, GLdouble y, GLdouble z )
 }
 template<typename T> inline void D3D_SetTexCoord( GLenum target, T s, T t, T r, T q, int num )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	//HACK: workaround for Quake3: it uses targets 0 and 1 instead of GL_TEXTURE0_ARB and GL_TEXTURE1_ARB
 	//HACK: it seems that drivers were fixed after Carmack's code, not vise versa : )
 	int stage = target;
@@ -1117,11 +1127,15 @@ OPENGL_API void WINAPI glFogCoordfv( GLfloat *coord )
 //=========================================
 template<typename T> inline void D3D_AddVertex( T x, T y, T z, T w )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pIMBuffer != NULL );
 	D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z, (FLOAT)w );
 }
 template<typename T> inline void D3D_AddVertex( T x, T y, T z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pIMBuffer != NULL );
 	D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z );
 }
@@ -1228,6 +1242,8 @@ OPENGL_API void WINAPI glVertex4sv( const GLshort *v )
 //=========================================
 OPENGL_API void WINAPI glBegin( GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DState_Check( );
 	D3DState_AssureBeginScene( );
 	assert( D3DGlobal.pIMBuffer != NULL );
@@ -1236,6 +1252,8 @@ OPENGL_API void WINAPI glBegin( GLenum mode )
 
 OPENGL_API void WINAPI glEnd( )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pIMBuffer != NULL );
 	D3DGlobal.pIMBuffer->End( );
 	D3DState.CurrentState.isSet.all = 0;
@@ -1246,6 +1264,8 @@ OPENGL_API void WINAPI glEnd( )
 //=========================================
 template<typename T> inline void D3D_Rect( T x1, T y1, T x2, T y2 )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	D3DState_Check( );
 	D3DState_AssureBeginScene( );
 	assert( D3DGlobal.pIMBuffer != NULL );

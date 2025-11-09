@@ -255,6 +255,8 @@ extern D3DState_t D3DState;
 
 inline void D3DState_SetRenderState( D3DRENDERSTATETYPE state, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.initialized) {
 		D3DGlobal.lastError = E_FAIL;
 		return;

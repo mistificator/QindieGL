@@ -36,6 +36,8 @@
 
 OPENGL_API const GLubyte * WINAPI glGetString( GLenum name )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.initialized)
 		return (GLubyte*)"";
 
@@ -53,6 +55,8 @@ OPENGL_API const GLubyte * WINAPI glGetString( GLenum name )
 
 OPENGL_API GLenum WINAPI glGetError()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (SUCCEEDED(D3DGlobal.lastError))
 		return GL_NO_ERROR;
 
@@ -94,6 +98,8 @@ OPENGL_API GLenum WINAPI glGetError()
 
 OPENGL_API HRESULT WINAPI glGetD3DError()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.lastError;
 }
 
@@ -101,6 +107,8 @@ OPENGL_API HRESULT WINAPI glGetD3DError()
 
 template<typename T> static void glGet( GLenum pname, T *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!params) return;
 
 	switch (pname) {

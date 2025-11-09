@@ -634,6 +634,8 @@ void qdx_imgui_deinit()
 
 void qdx_imgui_draw()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	
 	if ( g_use_shortcut_keys )
 	{
 		keys = keypress_get();

@@ -65,6 +65,8 @@
 
 static inline void CheckTexCoordOffset_Hack( bool ortho )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DGlobal.settings.texcoordFix )
 		return;
 
@@ -93,6 +95,8 @@ OPENGL_API void WINAPI glMatrixMode( GLenum mode )
 
 OPENGL_API void WINAPI glLoadIdentity()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DState.currentMatrixStack->load_identity( );
 	*D3DState.currentMatrixModified = true;
@@ -107,6 +111,8 @@ OPENGL_API void WINAPI glLoadIdentity()
 
 static void ProjectionMatrix_GLtoD3D( FLOAT *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( m[2*4+3] >= 0 ) {
 		//2D projection
 		//Restore znear and zfar from projection matrix
@@ -158,6 +164,8 @@ static void ProjectionMatrix_GLtoD3D( FLOAT *m )
 
 OPENGL_API void WINAPI glLoadMatrixf( const GLfloat *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	bool b2Dproj = false;
 	if( D3DGlobal.settings.projectionFix ) {
@@ -183,6 +191,8 @@ OPENGL_API void WINAPI glLoadMatrixf( const GLfloat *m )
 }
 OPENGL_API void WINAPI glLoadMatrixd( const GLdouble *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	bool b2Dproj = false;
 	FLOAT mf[16];
@@ -208,6 +218,8 @@ OPENGL_API void WINAPI glLoadMatrixd( const GLdouble *m )
 }
 OPENGL_API void WINAPI glMultMatrixf( const GLfloat *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DState.currentMatrixStack->multiply( m );
 	*D3DState.currentMatrixModified = true;
@@ -220,6 +232,8 @@ OPENGL_API void WINAPI glMultMatrixf( const GLfloat *m )
 }
 OPENGL_API void WINAPI glMultMatrixd( const GLdouble *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	FLOAT mf[16];
 	for( int i = 0; i < 16; ++i ) 
@@ -235,6 +249,8 @@ OPENGL_API void WINAPI glMultMatrixd( const GLdouble *m )
 }
 OPENGL_API void WINAPI glLoadTransposeMatrixf( const GLfloat *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	bool b2Dproj = false;
 	D3DXMATRIX mt;
@@ -259,6 +275,8 @@ OPENGL_API void WINAPI glLoadTransposeMatrixf( const GLfloat *m )
 }
 OPENGL_API void WINAPI glLoadTransposeMatrixd( const GLdouble *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	bool b2Dproj = false;
 	D3DXMATRIX mt;
@@ -285,6 +303,8 @@ OPENGL_API void WINAPI glLoadTransposeMatrixd( const GLdouble *m )
 }
 OPENGL_API void WINAPI glMultTransposeMatrixf( const GLfloat *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX mt;
 	D3DXMatrixTranspose( &mt,(D3DXMATRIX*)m );
@@ -299,6 +319,8 @@ OPENGL_API void WINAPI glMultTransposeMatrixf( const GLfloat *m )
 }
 OPENGL_API void WINAPI glMultTransposeMatrixd( const GLdouble *m )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX mt;
 	for( int i = 0; i < 4; ++i ) 
@@ -337,6 +359,8 @@ OPENGL_API void WINAPI glOrtho( GLdouble left, GLdouble right, GLdouble bottom, 
 }
 OPENGL_API void WINAPI glPopMatrix( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	HRESULT hr = D3DState.currentMatrixStack->pop( );
 	if( FAILED( hr ) ) D3DGlobal.lastError = hr;
@@ -350,6 +374,8 @@ OPENGL_API void WINAPI glPopMatrix( void )
 }
 OPENGL_API void WINAPI glPushMatrix( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	HRESULT hr = D3DState.currentMatrixStack->push( );
 	if( FAILED( hr ) ) D3DGlobal.lastError = hr;
@@ -362,6 +388,8 @@ OPENGL_API void WINAPI glPushMatrix( void )
 }
 OPENGL_API void WINAPI glRotatef( GLfloat angle, GLfloat x, GLfloat y, GLfloat z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXVECTOR3 v( x,y,z );
@@ -376,6 +404,8 @@ OPENGL_API void WINAPI glRotatef( GLfloat angle, GLfloat x, GLfloat y, GLfloat z
 }
 OPENGL_API void WINAPI glRotated( GLdouble angle, GLdouble x, GLdouble y, GLdouble z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXVECTOR3 v( (FLOAT)x,(FLOAT)y,(FLOAT)z );
@@ -390,6 +420,8 @@ OPENGL_API void WINAPI glRotated( GLdouble angle, GLdouble x, GLdouble y, GLdoub
 }
 OPENGL_API void WINAPI glScalef( GLfloat x, GLfloat y, GLfloat z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXMatrixScaling( &m, x, y, z );
@@ -403,6 +435,8 @@ OPENGL_API void WINAPI glScalef( GLfloat x, GLfloat y, GLfloat z )
 }
 OPENGL_API void WINAPI glScaled( GLdouble x, GLdouble y, GLdouble z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXMatrixScaling( &m,(FLOAT)x,(FLOAT)y,(FLOAT)z );
@@ -416,6 +450,8 @@ OPENGL_API void WINAPI glScaled( GLdouble x, GLdouble y, GLdouble z )
 }
 OPENGL_API void WINAPI glTranslatef( GLfloat x, GLfloat y, GLfloat z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXMatrixTranslation( &m, x, y, z );
@@ -429,6 +465,8 @@ OPENGL_API void WINAPI glTranslatef( GLfloat x, GLfloat y, GLfloat z )
 }
 OPENGL_API void WINAPI glTranslated( GLdouble x, GLdouble y, GLdouble z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if( !D3DState.currentMatrixStack ) return;
 	D3DXMATRIX m;
 	D3DXMatrixTranslation( &m,(FLOAT)x,(FLOAT)y,(FLOAT)z );
