@@ -1,7 +1,8 @@
 # QindieGL fork with Cmake build and x64 support
 
 ## Newly supported Games
-- [EDuke32](https://www.eduke32.com/) 
+- [EDuke32](https://www.eduke32.com/)
+- [Duke Nukem 3D Megaton Edition](https://steamcommunity.com/app/225140)
 
 ## Where to download binaries
 Look at [releases](https://github.com/mistificator/QindieGL/releases/) section.
