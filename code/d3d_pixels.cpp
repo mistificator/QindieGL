@@ -51,6 +51,9 @@ static inline unsigned int D3D_ByteSwap32( unsigned int x )
 
 inline void D3DPixels_ModifyA( GLubyte *a )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	float fA = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)(*a) / 255.0f) * D3DState.ClientPixelStoreState.transferAlphaScale + D3DState.ClientPixelStoreState.transferAlphaBias ));
 
 	if(D3DState.ClientPixelStoreState.transferMapColor)
@@ -61,6 +64,9 @@ inline void D3DPixels_ModifyA( GLubyte *a )
 
 inline void D3DPixels_ModifyBGR( GLubyte *bgr )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	float fR = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgr[2] / 255.0f) * D3DState.ClientPixelStoreState.transferRedScale + D3DState.ClientPixelStoreState.transferRedBias ));
 	float fG = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgr[1] / 255.0f) * D3DState.ClientPixelStoreState.transferGreenScale + D3DState.ClientPixelStoreState.transferGreenBias ));
 	float fB = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgr[0] / 255.0f) * D3DState.ClientPixelStoreState.transferBlueScale + D3DState.ClientPixelStoreState.transferBlueBias ));
@@ -78,6 +84,9 @@ inline void D3DPixels_ModifyBGR( GLubyte *bgr )
 
 inline void D3DPixels_ModifyBGRA( GLubyte *bgra )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	float fR = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[2] / 255.0f) * D3DState.ClientPixelStoreState.transferRedScale + D3DState.ClientPixelStoreState.transferRedBias ));
 	float fG = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[1] / 255.0f) * D3DState.ClientPixelStoreState.transferGreenScale + D3DState.ClientPixelStoreState.transferGreenBias ));
 	float fB = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[0] / 255.0f) * D3DState.ClientPixelStoreState.transferBlueScale + D3DState.ClientPixelStoreState.transferBlueBias ));
@@ -98,6 +107,9 @@ inline void D3DPixels_ModifyBGRA( GLubyte *bgra )
 
 inline void D3DPixels_ModifyABGR( GLubyte *bgra )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	float fR = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[3] / 255.0f) * D3DState.ClientPixelStoreState.transferRedScale + D3DState.ClientPixelStoreState.transferRedBias ));
 	float fG = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[2] / 255.0f) * D3DState.ClientPixelStoreState.transferGreenScale + D3DState.ClientPixelStoreState.transferGreenBias ));
 	float fB = QINDIEGL_MIN( 1.0f, QINDIEGL_MAX( 0.0f,((float)bgra[1] / 255.0f) * D3DState.ClientPixelStoreState.transferBlueScale + D3DState.ClientPixelStoreState.transferBlueBias ));
@@ -709,6 +721,9 @@ static T D3DPixels_AssemblePackedPixel( ePixelPackageInternal pack_mode, int num
 template<typename T> 
 static void D3DPixels_UnpackInternal( ePixelPackageInternal pack_mode, int width, int height, int depth, int hpitch, int vpitch, GLubyte *dstbytes, int dstpixelsize, eTexTypeInternal intfmt, DWORD channelMask, DWORD flags, bool flipVertical, int fmtpixelsize, int realpixelsize, const T *pixels )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GLubyte ubpixel[4];
 
 	int row_length = width*realpixelsize;
@@ -769,6 +784,9 @@ static void D3DPixels_UnpackInternal( ePixelPackageInternal pack_mode, int width
 
 static void D3DPixels_UnpackInternal( int width, int height, int depth, int hpitch, int vpitch, GLubyte *dstbytes, int dstpixelsize, eTexTypeInternal intfmt, DWORD channelMask, DWORD flags, bool flipVertical, int pixelsize, const GLfloat *pixels )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GLubyte ubpixel[4];
 
 	int row_length = width*pixelsize;
@@ -811,6 +829,9 @@ static void D3DPixels_UnpackInternal( int width, int height, int depth, int hpit
 template<typename T> 
 static void D3DPixels_PackInternal( ePixelPackageInternal pack_mode, int width, int height, int depth, int hpitch, int vpitch, const GLubyte *srcbytes, int srcpixelsize, eTexTypeInternal intfmt, DWORD channelMask, DWORD flags, bool flipVertical, int fmtpixelsize, int realpixelsize, T *pixels )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GLubyte ubpixel[4];
 	GLuint uipixel[2];
 
@@ -879,6 +900,9 @@ static void D3DPixels_PackInternal( ePixelPackageInternal pack_mode, int width, 
 
 static void D3DPixels_PackInternal( int width, int height, int depth, int hpitch, int vpitch, const GLubyte *srcbytes, int srcpixelsize, eTexTypeInternal intfmt, DWORD channelMask, DWORD flags, bool flipVertical, int fmtpixelsize, int realpixelsize, GLfloat *pixels )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GLubyte ubpixel[4];
 	GLuint uipixel[2];
 
@@ -1339,6 +1363,7 @@ OPENGL_API void WINAPI glDrawPixels( GLsizei, GLsizei, GLenum, GLenum, const GLv
 OPENGL_API void WINAPI glGetPixelMapfv( GLenum map, GLfloat *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD mapSize;
@@ -1372,6 +1397,7 @@ OPENGL_API void WINAPI glGetPixelMapfv( GLenum map, GLfloat *values )
 OPENGL_API void WINAPI glGetPixelMapuiv( GLenum map, GLuint *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD mapSize;
@@ -1405,6 +1431,7 @@ OPENGL_API void WINAPI glGetPixelMapuiv( GLenum map, GLuint *values )
 OPENGL_API void WINAPI glGetPixelMapusv( GLenum map, GLushort *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD mapSize;
@@ -1439,6 +1466,7 @@ OPENGL_API void WINAPI glGetPixelMapusv( GLenum map, GLushort *values )
 OPENGL_API void WINAPI glPixelMapfv( GLenum map, GLsizei mapsize, const GLfloat *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
@@ -1478,6 +1506,7 @@ OPENGL_API void WINAPI glPixelMapfv( GLenum map, GLsizei mapsize, const GLfloat 
 OPENGL_API void WINAPI glPixelMapuiv( GLenum map, GLsizei mapsize, const GLuint *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
@@ -1518,6 +1547,7 @@ OPENGL_API void WINAPI glPixelMapuiv( GLenum map, GLsizei mapsize, const GLuint 
 OPENGL_API void WINAPI glPixelMapusv( GLenum map, GLsizei mapsize, const GLushort *values )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	GLfloat *mapPointer;
 	DWORD *mapSizePointer;
@@ -1558,6 +1588,7 @@ OPENGL_API void WINAPI glPixelMapusv( GLenum map, GLsizei mapsize, const GLushor
 OPENGL_API void WINAPI glPixelStorei( GLenum pname, GLint param )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch(pname) {
 	case GL_UNPACK_SWAP_BYTES:
@@ -1632,6 +1663,7 @@ OPENGL_API void WINAPI glPixelStoref( GLenum pname, GLfloat param )
 OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch(pname) {
 	case GL_MAP_COLOR:
@@ -1679,6 +1711,7 @@ OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 OPENGL_API void WINAPI glPixelTransferf( GLenum pname, GLfloat param )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch(pname) {
 	case GL_MAP_COLOR:

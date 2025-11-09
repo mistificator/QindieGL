@@ -31,6 +31,7 @@
 OPENGL_API void WINAPI glGetLightfv( GLenum light, GLenum pname, GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int lightIndex = light - GL_LIGHT0;
 	if( lightIndex < 0 || lightIndex >= IMPL_MAX_LIGHTS ) {
@@ -104,6 +105,7 @@ OPENGL_API void WINAPI glGetLightiv( GLenum light, GLenum pname, GLint *params )
 OPENGL_API void WINAPI glLightModelf( GLenum pname, GLfloat param )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch( pname ) {
 	case GL_LIGHT_MODEL_LOCAL_VIEWER:
@@ -122,6 +124,7 @@ OPENGL_API void WINAPI glLightModelf( GLenum pname, GLfloat param )
 OPENGL_API void WINAPI glLightModelfv( GLenum pname, const GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch( pname ) {
 	case GL_LIGHT_MODEL_AMBIENT:
@@ -153,6 +156,7 @@ OPENGL_API void WINAPI glLightModeliv( GLenum pname, const GLint *params )
 OPENGL_API void WINAPI glLightf( GLenum light, GLenum pname, GLfloat param )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int lightIndex = light - GL_LIGHT0;
 	if( lightIndex < 0 || lightIndex >= IMPL_MAX_LIGHTS ) {
@@ -186,6 +190,7 @@ OPENGL_API void WINAPI glLightf( GLenum light, GLenum pname, GLfloat param )
 OPENGL_API void WINAPI glLightfv( GLenum light, GLenum pname, const GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int lightIndex = light - GL_LIGHT0;
 	if( lightIndex < 0 || lightIndex >= IMPL_MAX_LIGHTS ) {

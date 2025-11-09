@@ -48,9 +48,34 @@ D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT] = { 0 };
 D3DGlobal_t * D3DGlobalPtr = & D3DGlobals[0];
 
 static std::string g_gamename;
-static mINI::INIFile g_inifile(WRAPPER_GL_SHORT_NAME_STRING ".ini");
+static mINI::INIFile g_inifile(_T(""));
 static mINI::INIStructure g_iniconf;
 static bool g_iniavailable = false;
+
+std::tstring g_path;
+
+static bool inited = [](){
+	TCHAR buf[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, buf);
+	GetModuleFileName( NULL, buf, MAX_PATH );
+	* _tcsrchr( buf, '\\' ) = '\0';
+	g_path = buf;
+	g_path += _T("\\");
+
+	g_inifile = { g_path + _T( WRAPPER_GL_SHORT_NAME_STRING ) _T( ".ini" ) };
+	if (g_inifile.read(g_iniconf))
+	{
+		logPrintf( "ini file found at %s\n", buf );
+		g_iniavailable = true;
+	}
+	else
+	{
+		logPrintf( "ini file not found at %s\n", buf );
+		g_iniavailable = false;
+	}
+	return true;
+}();
+
 
 static BOOL D3DGlobal_InitializeDirect3D( void );
 
@@ -80,15 +105,6 @@ void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals )
 	for (int i = 0; i < D3D_TEXTARGET_MAX; ++i) {
 		if (!D3DGlobal.defaultTexture[i])
 			D3DGlobal.defaultTexture[i] = new D3DTextureObject(0);
-	}
-
-	if (g_inifile.read(g_iniconf))
-	{
-		g_iniavailable = true;
-	}
-	else
-	{
-		g_iniavailable = false;
 	}
 
 	if (!clearGlobals)
@@ -890,7 +906,7 @@ static BOOL D3DGlobal_InitializeDirect3D( void )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
 
-	if ( nullptr == (D3DGlobal.hD3DDll = LoadLibrary( _T( "d3d9.dll" ) )) ) {
+	if ( nullptr == (D3DGlobal.hD3DDll = LoadLibrary( (g_path + _T( "d3d9.dll" )).c_str() )) ) {
 		logPrintf( "wglCreateContext: failed to load d3d9.dll\n" );
 		return 0;
 	}
@@ -1228,6 +1244,8 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	//set default state
 	D3DState_SetDefaults();
 
+	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
+
 	//first clear
 	D3DGlobal.pDevice->Clear( 0, nullptr, (D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER|D3DCLEAR_STENCIL) & ~D3DGlobal.ignoreClearMask, 
 							  D3DState.ColorBufferState.clearColor, D3DState.DepthBufferState.clearDepth, D3DState.StencilBufferState.clearStencil );
@@ -1437,6 +1455,7 @@ OPENGL_API BOOL WINAPI wrap_wglMakeCurrent(HDC hdc, HGLRC hglrc)
 OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if (!D3DGlobal.hGLRC)
 		return FALSE;
@@ -1633,36 +1652,78 @@ OPENGL_API BOOL WINAPI wrap_wglSetPixelFormat( HDC hdc, int index, CONST PIXELFO
 
 OPENGL_API BOOL WINAPI wrap_wglCopyContext( HGLRC, HGLRC, UINT )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglCopyContext not supported\n");
+	}
+
 	return FALSE;
 }
 
 OPENGL_API HGLRC WINAPI wrap_wglCreateLayerContext( HDC, int )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglCreateLayerContext not supported\n");
+	}
+
 	return (HGLRC)0;
 }
 
 OPENGL_API BOOL WINAPI wrap_wglDescribeLayerPlane( HDC, int, int, UINT, LPLAYERPLANEDESCRIPTOR )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglDescribeLayerPlane not supported\n");
+	}
+
 	return FALSE;
 }
 
 OPENGL_API int WINAPI wrap_wglGetLayerPaletteEntries( HDC, int, int, int, COLORREF* )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglGetLayerPaletteEntries not supported\n");
+	}
+
 	return 0;
 }
 
 OPENGL_API int WINAPI wrap_wglSetLayerPaletteEntries( HDC, int, int, int, CONST COLORREF* )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglSetLayerPaletteEntries not supported\n");
+	}
+
 	return 0;
 }
 
 OPENGL_API BOOL WINAPI wrap_wglRealizeLayerPalette( HDC, int, BOOL )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglRealizeLayerPalette not supported\n");
+	}
+
 	return FALSE;
 }
 
 OPENGL_API BOOL WINAPI wrap_wglSwapLayerBuffers( HDC, UINT )
 {
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: wglSwapLayerBuffers not supported\n");
+	}
+
 	return FALSE;
 }
 
@@ -1709,8 +1770,20 @@ OPENGL_API int WINAPI wglGetSwapInterval()
 OPENGL_API void WINAPI glPNTrianglesiATI( GLenum pname, GLint param )
 {
 	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
+
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glPNTrianglesiATI not supported\n");
+	}	
 }
 OPENGL_API void WINAPI glPNTrianglesfATI( GLenum pname, GLfloat param )
 {
 	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
+
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glPNTrianglesfATI not supported\n");
+	}	
 }

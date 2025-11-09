@@ -68,6 +68,9 @@ static void TexGenFunc_None( int /*stage*/, int coord, const GLfloat* /*vertex*/
 
 static void TexGenFunc_ObjectLinear( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	const float *p = D3DState.TextureState.TexGen[stage][coord].objectPlane;
 	float out_coord = 0.0f;
 
@@ -81,6 +84,9 @@ static void TexGenFunc_ObjectLinear( int stage, int coord, const GLfloat* vertex
 #else
 static void TexGenFunc_ObjectLinear_SSE( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	_declspec(align(16)) float sse_vertex[4];
 	_declspec(align(16)) float sse_plane[4];
 	float out_coord = 0.0f;
@@ -105,6 +111,9 @@ static void TexGenFunc_ObjectLinear_SSE( int stage, int coord, const GLfloat* ve
 
 static void TexGenFunc_EyeLinear( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	const float *p = D3DState.TextureState.TexGen[stage][coord].eyePlane;
 	float out_coord = 0.0f;
 	for (int i = 0; i < 4; ++i, ++vertex, ++p)
@@ -117,6 +126,9 @@ static void TexGenFunc_EyeLinear( int stage, int coord, const GLfloat* vertex, c
 #else
 static void TexGenFunc_EyeLinear_SSE( int stage, int coord, const GLfloat* vertex, const GLfloat* /*normal*/, float *output_texcoord )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	_declspec(align(16)) float sse_vertex[4];
 	_declspec(align(16)) float sse_plane[4];
 	float out_coord = 0.0f;
@@ -285,6 +297,7 @@ static void TexGenFunc_NormalMap( int /*stage*/, int coord, const GLfloat* /*ver
 void SelectTexGenFunc( int stage, int coord )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch (D3DState.TextureState.TexGen[stage][coord].mode) {
 	case GL_OBJECT_LINEAR:
@@ -324,6 +337,7 @@ template<typename T>
 static void SetupTexGen( int stage, int coord, GLenum pname, const T *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch (pname) {
 	case GL_TEXTURE_GEN_MODE:
@@ -355,6 +369,9 @@ static void SetupTexGen( int stage, int coord, GLenum pname, const T *params )
 template<typename T>
 static void GetTexGen( int stage, int coord, GLenum pname, T *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (pname) {
 	case GL_TEXTURE_GEN_MODE:
 		params[0] = (T)D3DState.TextureState.TexGen[stage][coord].mode;
@@ -380,37 +397,64 @@ static void GetTexGen( int stage, int coord, GLenum pname, T *params )
 
 OPENGL_API void WINAPI glTexGenf( GLenum coord,  GLenum pname,  GLfloat param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGend( GLenum coord,  GLenum pname,  GLdouble param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGeni( GLenum coord,  GLenum pname,  GLint param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGenfv( GLenum coord,  GLenum pname,  const GLfloat *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glTexGendv( GLenum coord,  GLenum pname,  const GLdouble *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glTexGeniv( GLenum coord,  GLenum pname,  const GLint *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glGetTexGenfv( GLenum coord,  GLenum pname,  GLfloat *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GetTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glGetTexGendv( GLenum coord,  GLenum pname,  GLdouble *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GetTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glGetTexGeniv( GLenum coord,  GLenum pname,  GLint *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	GetTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }

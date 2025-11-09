@@ -790,6 +790,7 @@ void D3DTextureObject :: SetMinFilter( GLenum mode )
 static void D3DTex_LoadImage(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels)
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -903,6 +904,7 @@ static void D3DTex_LoadImage(GLenum target, GLint level, GLint internalformat, G
 static void D3DTex_LoadSubImage(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels)
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -933,6 +935,7 @@ static void D3DTex_LoadSubImage(GLenum target, GLint level, GLint xoffset, GLint
 static void D3DTex_LoadCompressedImage(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const GLvoid *pixels)
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if (!D3DGlobal.supportsS3TC) {
 		logPrintf("WARNING: S3TC texture compression is not supported\n");
@@ -1039,6 +1042,7 @@ static void D3DTex_LoadCompressedSubImage( GLenum /*target*/, GLint /*level*/, G
 static void D3DTex_CopySubImage( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if (D3DGlobal.skipCopyImage) {
 		D3DGlobal.skipCopyImage--;
@@ -1137,6 +1141,7 @@ OPENGL_API void WINAPI glPrioritizeTextures( GLsizei n, const GLuint *textures, 
 OPENGL_API void WINAPI glBindTexture( GLenum target, GLuint texture )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1257,6 +1262,7 @@ OPENGL_API void WINAPI glCopyTexSubImage3D( GLenum /*target*/, GLint /*level*/, 
 OPENGL_API void WINAPI glGetTexImage( GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1281,6 +1287,7 @@ OPENGL_API void WINAPI glGetTexImage( GLenum target, GLint level, GLenum format,
 OPENGL_API void WINAPI glGetCompressedTexImage( GLenum target, GLint level, GLvoid * /*img*/ )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1309,6 +1316,7 @@ OPENGL_API void WINAPI glGetCompressedTexImage( GLenum target, GLint level, GLvo
 OPENGL_API void WINAPI glTexParameterfv( GLenum target, GLenum pname, const GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1382,6 +1390,7 @@ OPENGL_API void WINAPI glTexParameteriv( GLenum target, GLenum pname, const GLin
 OPENGL_API void WINAPI glGetTexParameterfv( GLenum target, GLenum pname, GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1440,6 +1449,7 @@ OPENGL_API void WINAPI glGetTexParameterfv( GLenum target, GLenum pname, GLfloat
 OPENGL_API void WINAPI glGetTexParameteriv( GLenum target, GLenum pname, GLint *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
@@ -1474,6 +1484,7 @@ OPENGL_API void WINAPI glGetTexParameteriv( GLenum target, GLenum pname, GLint *
 OPENGL_API void WINAPI glTexEnvfv( GLenum target, GLenum pname, const GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch (target) 
 	{
@@ -1710,6 +1721,9 @@ OPENGL_API void WINAPI glTexEnvf( GLenum target, GLenum pname, GLfloat param )
 
 OPENGL_API void WINAPI glTexEnviv( GLenum target, GLenum pname, const GLint *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (target == GL_TEXTURE_ENV) {
 		if (pname == GL_TEXTURE_ENV_COLOR) {
 			D3DCOLOR envColor = D3DCOLOR_ARGB( QINDIEGL_CLAMP( (GLfloat)(params[3] / INT_MAX) * 255 ),
@@ -1740,6 +1754,7 @@ OPENGL_API void WINAPI glTexEnvi( GLenum target, GLenum pname, GLint param )
 OPENGL_API void WINAPI glGetTexEnvfv( GLenum target, GLenum pname, GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	switch (target) 
 	{
@@ -1833,6 +1848,7 @@ OPENGL_API void WINAPI glGetTexEnvfv( GLenum target, GLenum pname, GLfloat *para
 OPENGL_API void WINAPI glGetTexEnviv( GLenum target, GLenum pname, GLint *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if (target != GL_TEXTURE_ENV) {
 		logPrintf("WARNING: glGetTexEnviv - unknown target 0x%x\n", target);
@@ -1862,6 +1878,7 @@ OPENGL_API void WINAPI glGetTexEnviv( GLenum target, GLenum pname, GLint *params
 OPENGL_API void WINAPI glGetTexLevelParameterfv( GLenum target, GLint level, GLenum pname, GLfloat *params )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	D3DTextureObject *currentTexture( nullptr );
 
@@ -1900,6 +1917,7 @@ OPENGL_API void WINAPI glGetTexLevelParameteriv( GLenum target, GLint level, GLe
 OPENGL_API void WINAPI glActiveTexture( GLenum texture )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int stageIndex = texture - GL_TEXTURE0_ARB;
 	if (stageIndex < 0 || stageIndex >= D3DGlobal.maxActiveTMU) {
@@ -1914,6 +1932,7 @@ OPENGL_API void WINAPI glActiveTexture( GLenum texture )
 OPENGL_API void WINAPI glClientActiveTexture( GLenum texture )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int stageIndex = texture - GL_TEXTURE0_ARB;
 	if (stageIndex < 0 || stageIndex >= D3DGlobal.maxActiveTMU) {
@@ -1926,6 +1945,7 @@ OPENGL_API void WINAPI glClientActiveTexture( GLenum texture )
 OPENGL_API void WINAPI glSelectTexture( GLenum texture )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int stageIndex = texture - GL_TEXTURE0_SGIS;
 	if (stageIndex < 0 || stageIndex >= D3DGlobal.maxActiveTMU) {

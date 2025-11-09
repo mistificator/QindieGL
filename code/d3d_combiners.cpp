@@ -89,6 +89,7 @@ static TNTCombinerReplacement s_TNTCombinerReplacements[] = {
 void D3DState_BuildTextureReferences()
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	D3DState.TextureState.textureReference = 0;
 	GLenum lasttexture = GL_TEXTURE0_ARB + (unsigned int)D3DGlobal.maxActiveTMU;
@@ -145,6 +146,7 @@ void D3DState_BuildTextureReferences()
 bool D3DState_ValidateCombiner( int combiner, int sampler )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if ( D3DState.TextureState.TextureCombineState[combiner].envMode != GL_COMBINE_ARB )
 		return true;
@@ -244,6 +246,7 @@ static const char* CombineOperandToString( GLenum func )
 static void DumpCombiners() 
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int numActiveTextures = 0;
 	for (int i = 0; i < D3DGlobal.maxActiveTMU; ++i) {
@@ -282,6 +285,7 @@ static void DumpCombiners()
 static void D3DState_ApplyD3DCombiner( TNTCombinerReplacement *pRep )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	for ( int i = 0; i < pRep->numD3DCombiners; ++i ) {
 		D3DGlobal.pDevice->SetTextureStageState( i, D3DTSS_COLOROP, pRep->D3DCombiner[i].colorOp );
@@ -300,6 +304,7 @@ static void D3DState_ApplyD3DCombiner( TNTCombinerReplacement *pRep )
 void D3DState_SetupCombiners()
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	int numActiveTextures = 0;
 	for (int i = 0; i < D3DGlobal.maxActiveTMU; ++i) {

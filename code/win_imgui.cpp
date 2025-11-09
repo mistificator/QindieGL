@@ -635,6 +635,7 @@ void qdx_imgui_deinit()
 void qdx_imgui_draw()
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 	
 	if ( g_use_shortcut_keys )
 	{

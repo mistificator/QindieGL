@@ -62,6 +62,7 @@ void D3DIMBuffer :: EnsureBufferSize( int numVerts )
 UINT D3DIMBuffer :: ReorderBufferToFVF( int fvf, int fvfsz )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	const D3DIMBufferVertex *src = m_pBuffer;
 	float *dst = nullptr;
@@ -143,6 +144,7 @@ void D3DIMBuffer :: Begin( GLenum primType )
 void D3DIMBuffer :: End( )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if ( !m_vertexCount || !m_bBegan ) 
 		return;
@@ -301,6 +303,9 @@ void D3DIMBuffer :: End( )
 
 void D3DIMBuffer :: SetupTexCoords( D3DIMBufferVertex *pVertex, int stage )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if ( !D3DState.EnableState.texGenEnabled[stage] ) {
 		memcpy( pVertex->texCoord[stage], D3DState.CurrentState.currentTexCoord[stage], sizeof(FLOAT)*4 );
 		return;
@@ -332,6 +337,7 @@ void D3DIMBuffer :: SetupTexCoords( D3DIMBufferVertex *pVertex, int stage )
 void D3DIMBuffer :: AddVertex( float x, float y, float z )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if ( !m_bBegan ) return;
 
@@ -369,6 +375,7 @@ void D3DIMBuffer :: AddVertex( float x, float y, float z )
 void D3DIMBuffer :: AddVertex( float x, float y, float z, float w )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	if ( !m_bBegan ) return;
 
@@ -410,6 +417,9 @@ void D3DIMBuffer :: AddVertex( float x, float y, float z, float w )
 //=========================================
 template<typename T> inline void D3D_SetColor( T red, T green, T blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		0xFF,
@@ -420,6 +430,9 @@ template<typename T> inline void D3D_SetColor( T red, T green, T blue )
 }
 template<typename T> inline void D3D_SetColor( T red, T green, T blue, T alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		QINDIEGL_CLAMP( ( alpha / std::numeric_limits<T>::max( ) ) * 255 ),
@@ -430,6 +443,9 @@ template<typename T> inline void D3D_SetColor( T red, T green, T blue, T alpha )
 }
 inline void D3D_SetColor( GLbyte red, GLbyte green, GLbyte blue, GLbyte alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		( BYTE )alpha,
@@ -440,6 +456,9 @@ inline void D3D_SetColor( GLbyte red, GLbyte green, GLbyte blue, GLbyte alpha )
 }
 inline void D3D_SetColor( GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		alpha,
@@ -450,6 +469,9 @@ inline void D3D_SetColor( GLubyte red, GLubyte green, GLubyte blue, GLubyte alph
 }
 inline void D3D_SetColor( GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		QINDIEGL_CLAMP( alpha * 255.0f ),
@@ -460,6 +482,9 @@ inline void D3D_SetColor( GLfloat red, GLfloat green, GLfloat blue, GLfloat alph
 }
 inline void D3D_SetColor( GLdouble red, GLdouble green, GLdouble blue, GLdouble alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color = 1;
 	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
 		QINDIEGL_CLAMP( (FLOAT)alpha * 255.0f ),
@@ -470,6 +495,9 @@ inline void D3D_SetColor( GLdouble red, GLdouble green, GLdouble blue, GLdouble 
 }
 template<typename T> inline void D3D_SetColor2( T red, T green, T blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color2 = 1;
 	D3DState.CurrentState.currentColor2 &= 0xFF000000;
 	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ) << 16;
@@ -478,6 +506,9 @@ template<typename T> inline void D3D_SetColor2( T red, T green, T blue )
 }
 inline void D3D_SetColor2( GLbyte red, GLbyte green, GLbyte blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color2 = 1;
 	D3DState.CurrentState.currentColor2 &= 0xFF000000;
 	D3DState.CurrentState.currentColor2 |= ( BYTE )red << 16;
@@ -486,6 +517,9 @@ inline void D3D_SetColor2( GLbyte red, GLbyte green, GLbyte blue )
 }
 inline void D3D_SetColor2( GLubyte red, GLubyte green, GLubyte blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color2 = 1;
 	D3DState.CurrentState.currentColor2 &= 0xFF000000;
 	D3DState.CurrentState.currentColor2 |= red << 16;
@@ -494,6 +528,9 @@ inline void D3D_SetColor2( GLubyte red, GLubyte green, GLubyte blue )
 }
 inline void D3D_SetColor2( GLfloat red, GLfloat green, GLfloat blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color2 = 1;
 	D3DState.CurrentState.currentColor2 &= 0xFF000000;
 	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( red * 255.0f ) << 16;
@@ -502,6 +539,9 @@ inline void D3D_SetColor2( GLfloat red, GLfloat green, GLfloat blue )
 }
 inline void D3D_SetColor2( GLdouble red, GLdouble green, GLdouble blue )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.color2 = 1;
 	D3DState.CurrentState.currentColor2 &= 0xFF000000;
 	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( (FLOAT)red * 255.0f ) << 16;
@@ -510,6 +550,9 @@ inline void D3D_SetColor2( GLdouble red, GLdouble green, GLdouble blue )
 }
 inline void D3D_SetFogCoord( GLfloat value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.fog = 1;
 	GLubyte byteValue = 255 - static_cast<GLubyte>( QINDIEGL_CLAMP( value * 255.0f ) );
 	D3DState.CurrentState.currentColor2 &= ( byteValue << 24 );
@@ -517,6 +560,9 @@ inline void D3D_SetFogCoord( GLfloat value )
 }
 template<typename T> inline void D3D_SetNormal( T x, T y, T z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.norm = 1;
 	D3DState.CurrentState.currentNormal[0] = (FLOAT)x / std::numeric_limits<T>::max( );
 	D3DState.CurrentState.currentNormal[1] = (FLOAT)y / std::numeric_limits<T>::max( );
@@ -524,6 +570,9 @@ template<typename T> inline void D3D_SetNormal( T x, T y, T z )
 }
 inline void D3D_SetNormal( GLfloat x, GLfloat y, GLfloat z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.norm = 1;
 	D3DState.CurrentState.currentNormal[0] = x;
 	D3DState.CurrentState.currentNormal[1] = y;
@@ -531,6 +580,9 @@ inline void D3D_SetNormal( GLfloat x, GLfloat y, GLfloat z )
 }
 inline void D3D_SetNormal( GLdouble x, GLdouble y, GLdouble z )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.CurrentState.isSet.bits.norm = 1;
 	D3DState.CurrentState.currentNormal[0] = (FLOAT)x;
 	D3DState.CurrentState.currentNormal[1] = (FLOAT)y;
@@ -539,6 +591,7 @@ inline void D3D_SetNormal( GLdouble x, GLdouble y, GLdouble z )
 template<typename T> inline void D3D_SetTexCoord( GLenum target, T s, T t, T r, T q, int num )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	//HACK: workaround for Quake3: it uses targets 0 and 1 instead of GL_TEXTURE0_ARB and GL_TEXTURE1_ARB
 	//HACK: it seems that drivers were fixed after Carmack's code, not vise versa : )
@@ -1253,6 +1306,7 @@ OPENGL_API void WINAPI glBegin( GLenum mode )
 OPENGL_API void WINAPI glEnd( )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	assert( D3DGlobal.pIMBuffer != NULL );
 	D3DGlobal.pIMBuffer->End( );

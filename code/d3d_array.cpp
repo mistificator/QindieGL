@@ -255,6 +255,9 @@ int D3DVABuffer :: SetMinimumIndexBufferSize( int numIndices )
 
 void D3DVABuffer :: SetupTexCoords( const float *texcoords, int num_coords, const float *position, const float *normal, int stage, float *out_texcoords )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DState.EnableState.texGenEnabled[stage]) {
 		memcpy( out_texcoords, texcoords, sizeof(float)*num_coords );
 		return;
@@ -286,6 +289,7 @@ void D3DVABuffer :: SetupTexCoords( const float *texcoords, int num_coords, cons
 void D3DVABuffer :: Lock( GLint first, GLint last )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	float defaultNormal[3] = { 0, 0, 1 };
 	float vertexData[4];
@@ -846,6 +850,9 @@ void D3DVABuffer :: DrawPrimitive()
 
 OPENGL_API void WINAPI glColorPointer( GLint size, GLenum type, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.colorInfo.elementCount = size;
 	D3DState.ClientVertexArrayState.colorInfo.elementType = type;
 	D3DState.ClientVertexArrayState.colorInfo.stride = stride;
@@ -855,6 +862,9 @@ OPENGL_API void WINAPI glColorPointer( GLint size, GLenum type, GLsizei stride, 
 }
 OPENGL_API void WINAPI glSecondaryColorPointer( GLint size, GLenum type, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.color2Info.elementCount = size;
 	D3DState.ClientVertexArrayState.color2Info.elementType = type;
 	D3DState.ClientVertexArrayState.color2Info.stride = stride;
@@ -862,6 +872,9 @@ OPENGL_API void WINAPI glSecondaryColorPointer( GLint size, GLenum type, GLsizei
 }
 OPENGL_API void WINAPI glFogCoordPointer( GLenum type, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.fogInfo.elementCount = 1;
 	D3DState.ClientVertexArrayState.fogInfo.elementType = type;
 	D3DState.ClientVertexArrayState.fogInfo.stride = stride;
@@ -869,6 +882,9 @@ OPENGL_API void WINAPI glFogCoordPointer( GLenum type, GLsizei stride, const GLv
 }
 OPENGL_API void WINAPI glNormalPointer( GLenum type, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.normalInfo.elementCount = 3;
 	D3DState.ClientVertexArrayState.normalInfo.elementType = type;
 	D3DState.ClientVertexArrayState.normalInfo.stride = stride;
@@ -878,6 +894,9 @@ OPENGL_API void WINAPI glNormalPointer( GLenum type, GLsizei stride, const GLvoi
 }
 OPENGL_API void WINAPI glTexCoordPointer( GLint size, GLenum type, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.texCoordInfo[D3DState.ClientTextureState.currentClientTMU].elementCount = size;
 	D3DState.ClientVertexArrayState.texCoordInfo[D3DState.ClientTextureState.currentClientTMU].elementType = type;
 	D3DState.ClientVertexArrayState.texCoordInfo[D3DState.ClientTextureState.currentClientTMU].stride = stride;
@@ -888,6 +907,7 @@ OPENGL_API void WINAPI glTexCoordPointer( GLint size, GLenum type, GLsizei strid
 OPENGL_API void WINAPI glVertexPointer( GLint size, GLenum type, GLsizei stride, const GLvoid *pointer )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	D3DState.ClientVertexArrayState.vertexInfo.elementCount = size;
 	D3DState.ClientVertexArrayState.vertexInfo.elementType = type;
@@ -910,6 +930,9 @@ OPENGL_API void WINAPI glIndexPointer( GLenum, GLsizei, const GLvoid* )
 
 OPENGL_API void WINAPI glInterleavedArrays( GLenum format, GLsizei stride, const GLvoid *pointer )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.ClientVertexArrayState.vertexArrayEnable = VA_ENABLE_VERTEX_BIT;
 	D3DState.ClientVertexArrayState.vertexInfo._internal.compiledFirst = 0;
 	D3DState.ClientVertexArrayState.vertexInfo._internal.compiledLast = -1;
@@ -1196,6 +1219,7 @@ OPENGL_API void WINAPI glInterleavedArrays( GLenum format, GLsizei stride, const
 OPENGL_API void WINAPI glArrayElement( GLint i )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	assert( D3DGlobal.pIMBuffer != nullptr );
 	if (!(D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_VERTEX_BIT)) {
@@ -1247,6 +1271,7 @@ OPENGL_API void WINAPI glArrayElement( GLint i )
 static void internal_DrawArrays( GLenum mode, GLint first, GLsizei count )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 #if defined(VA_USE_IMMEDIATE_MODE)
 	assert( D3DGlobal.pIMBuffer != nullptr );
@@ -1285,6 +1310,7 @@ static void internal_DrawArrays( GLenum mode, GLint first, GLsizei count )
 static void internal_DrawElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type,  const GLvoid *indices )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 #if defined(VA_USE_IMMEDIATE_MODE)
 	assert( D3DGlobal.pIMBuffer != nullptr );
@@ -1439,6 +1465,9 @@ static inline bool CheckCompiledArraySize( T **arr, GLsizei *curSize, GLsizei re
 
 OPENGL_API void WINAPI glUnlockArrays( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (D3DState.ClientVertexArrayState.vertexInfo._internal.compiledLast >= 0) {
 		D3DState.ClientVertexArrayState.vertexInfo._internal.compiledFirst = 0;
 		D3DState.ClientVertexArrayState.vertexInfo._internal.compiledLast = -1;
@@ -1462,6 +1491,7 @@ OPENGL_API void WINAPI glUnlockArrays( void )
 OPENGL_API void WINAPI glLockArrays( GLint first, GLsizei count )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
 
 	//compile vertex, normal, texcoord and color arrays
 	//secondary color and fog coord arrays are NOT compiled

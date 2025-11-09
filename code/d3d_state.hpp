@@ -21,6 +21,8 @@
 #ifndef QINDIEGL_D3D_STATE_H
 #define QINDIEGL_D3D_STATE_H
 
+#include <list>
+
 typedef void (*pfnTexGen)( int stage, int coord, const GLfloat *vertex, const float *normal, float *output_texcoord );
 typedef void (*pfnTrVertex)( const GLfloat *vertex, float *output );
 typedef void (*pfnTrNormal)( const GLfloat *normal, float *output );
@@ -251,7 +253,8 @@ typedef struct D3DState_s
 
 } D3DState_t;
 
-extern D3DState_t D3DState;
+#define D3D_STATE_STACK_DEPTH 16
+extern std::list<D3DState_t> D3DStates[D3D_CONTEXTS_COUNT];
 
 inline void D3DState_SetRenderState( D3DRENDERSTATETYPE state, DWORD value )
 {
@@ -275,5 +278,9 @@ extern void D3DState_Check();
 
 extern OPENGL_API void WINAPI glEnableClientState( GLenum cap );
 extern OPENGL_API void WINAPI glDisableClientState( GLenum cap );
+
+extern D3DState_t & D3DStateForContextIndex( size_t index );
+extern D3DState_t & D3DStateForContext( HGLRC hGLRC );
+
 
 #endif //QINDIEGL_D3D_STATE_H

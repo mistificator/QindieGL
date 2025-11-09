@@ -21,6 +21,21 @@
 #ifndef QINDIEGL_D3D_GLOBAL_H
 #define QINDIEGL_D3D_GLOBAL_H
 
+#include <string>
+#include <tchar.h>
+
+#ifdef _UNICODE
+	namespace std
+	{
+		using tstring = wstring;
+	}
+#else
+	namespace std
+	{
+		using tstring = string;
+	}
+#endif
+
 typedef IDirect3D9* (WINAPI *pfnDirect3DCreate9)( UINT SDKVersion );
 typedef int (WINAPI *pfnD3DPERF_BeginEvent)( D3DCOLOR col, LPCWSTR wszName );
 typedef int (WINAPI *pfnD3DPERF_EndEvent)( void );
@@ -217,5 +232,9 @@ typedef struct resolution_info_s
 } resolution_info_t;
 
 extern int D3DGlobal_GetResolutions( resolution_info_t* resolutions, int count );
+
+extern size_t D3DContexIndex( HGLRC hglrc );
+
+extern std::tstring g_path;
 
 #endif //QINDIEGL_D3D_GLOBAL_H
