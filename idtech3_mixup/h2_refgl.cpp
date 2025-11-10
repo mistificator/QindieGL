@@ -1880,6 +1880,9 @@ static void R_RenderSurfs( int flags )
 
 static void hk_R_EmitWaterPolys(msurface_t* fa, qboolean undulate)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	HOOK_ONLINE_NOTICE();
 
 	glpoly_t	*p, *bp;
@@ -1965,6 +1968,9 @@ static void hk_R_EmitWaterPolys(msurface_t* fa, qboolean undulate)
 
 static void hk_R_EmitUnderwaterPolys(msurface_t* fa)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	HOOK_ONLINE_NOTICE();
 
 	glpoly_t	*p, *bp;
@@ -2032,6 +2038,9 @@ static void hk_R_EmitUnderwaterPolys(msurface_t* fa)
 
 static void hk_R_EmitQuakeFloorPolys(msurface_t* fa)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	HOOK_ONLINE_NOTICE();
 
 	glpoly_t	*p, *bp;

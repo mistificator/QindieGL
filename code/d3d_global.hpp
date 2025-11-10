@@ -21,6 +21,21 @@
 #ifndef QINDIEGL_D3D_GLOBAL_H
 #define QINDIEGL_D3D_GLOBAL_H
 
+#include <string>
+#include <tchar.h>
+
+#ifdef _UNICODE
+	namespace std
+	{
+		using tstring = wstring;
+	}
+#else
+	namespace std
+	{
+		using tstring = string;
+	}
+#endif
+
 typedef IDirect3D9* (WINAPI *pfnDirect3DCreate9)( UINT SDKVersion );
 typedef int (WINAPI *pfnD3DPERF_BeginEvent)( D3DCOLOR col, LPCWSTR wszName );
 typedef int (WINAPI *pfnD3DPERF_EndEvent)( void );
@@ -191,10 +206,12 @@ typedef struct D3DGlobal_s
 
 #define GLOBAL_GAMENAME "game.global"
 
-extern D3DGlobal_t D3DGlobal;
+#define D3D_CONTEXTS_COUNT 8
+extern D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT];
+extern D3DGlobal_t * D3DGlobalPtr;
 
-extern void D3DGlobal_Init( bool clearGlobals );
-extern void D3DGlobal_Cleanup( bool cleanupAll );
+extern void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals );
+extern void D3DGlobal_Cleanup( D3DGlobal_t * D3DGlobalPtrLocal, bool cleanupAll );
 extern const char* D3DGlobal_FormatToString( D3DFORMAT format );
 extern DWORD D3DGlobal_GetRegistryValue( const char *key, const char *section, DWORD defaultValue );
 extern void* D3DGlobal_GetIniHandler();
@@ -215,5 +232,8 @@ typedef struct resolution_info_s
 } resolution_info_t;
 
 extern int D3DGlobal_GetResolutions( resolution_info_t* resolutions, int count );
+
+extern size_t D3DContextIndex( HGLRC hglrc );
+extern std::tstring D3DAppPath();
 
 #endif //QINDIEGL_D3D_GLOBAL_H

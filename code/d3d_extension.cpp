@@ -33,7 +33,21 @@
 
 OPENGL_API const char* WINAPI wglGetExtensionsStringARB( HDC )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.szWExtensions;
+}
+
+extern OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc );
+
+OPENGL_API HGLRC WINAPI wglCreateContextAttribsARB( HDC hDC, HGLRC hShareContext, const int *attribList )
+{
+	HGLRC hContext = wrap_wglCreateContext( hDC );
+	if ( hShareContext )
+	{
+		// something to copy state here?
+	}
+	return hContext;
 }
 
 typedef struct glext_entry_point_s
@@ -181,6 +195,11 @@ static glext_entry_point_t glext_EntryPoints[] =
 	//WGL_ARB_extensions_string
 	WGL_EXT_ENTRY_POINT( "ARB", "extensions_string", wglGetExtensionsStringARB, -2 ),
 
+	// WGL_ARB_create_context
+	// WGL_ARB_create_context_profile
+	WGL_EXT_ENTRY_POINT( "ARB", "create_context", wglCreateContextAttribsARB, -2 ),
+	WGL_EXT_ENTRY_POINT( "ARB", "create_context_profile", wglCreateContextAttribsARB, -2 ),
+
 	{ NULL, NULL }
 };
 
@@ -221,6 +240,8 @@ private:
 
 void D3DExtension_BuildExtensionsString()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	assert( D3DGlobal.pD3D != NULL );
 	assert( D3DGlobal.pDevice != NULL );
 
@@ -378,6 +399,8 @@ void D3DExtension_BuildExtensionsString()
 //=========================================
 OPENGL_API PROC WINAPI wrap_wglGetProcAddress( LPCSTR s )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	// WG: some games check for this being NULL, and crash
 	static size_t stubAddress = NULL;// 0xBAD00000;
 	const char *pszDisabledExt = NULL;

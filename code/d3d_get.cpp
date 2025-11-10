@@ -36,6 +36,8 @@
 
 OPENGL_API const GLubyte * WINAPI glGetString( GLenum name )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.initialized)
 		return (GLubyte*)"";
 
@@ -53,6 +55,8 @@ OPENGL_API const GLubyte * WINAPI glGetString( GLenum name )
 
 OPENGL_API GLenum WINAPI glGetError()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (SUCCEEDED(D3DGlobal.lastError))
 		return GL_NO_ERROR;
 
@@ -94,6 +98,8 @@ OPENGL_API GLenum WINAPI glGetError()
 
 OPENGL_API HRESULT WINAPI glGetD3DError()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	return D3DGlobal.lastError;
 }
 
@@ -101,6 +107,9 @@ OPENGL_API HRESULT WINAPI glGetD3DError()
 
 template<typename T> static void glGet( GLenum pname, T *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!params) return;
 
 	switch (pname) {
@@ -151,7 +160,7 @@ template<typename T> static void glGet( GLenum pname, T *params )
 		break;
 	case GL_MAX_ATTRIB_STACK_DEPTH:
 	case GL_MAX_CLIENT_ATTRIB_STACK_DEPTH:
-		params[0] = (T)1;
+		params[0] = (T)D3D_STATE_STACK_DEPTH;
 		break;
 	case GL_MAX_CLIP_PLANES:
 		params[0] = (T)(QINDIEGL_MIN( D3DGlobal.hD3DCaps.MaxUserClipPlanes, IMPL_MAX_CLIP_PLANES ));
@@ -574,6 +583,9 @@ OPENGL_API void WINAPI glGetFloatv( GLenum pname, GLfloat *params )
 
 OPENGL_API void WINAPI glGetPointerv( GLenum pname, GLvoid* *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (pname) {
 	case GL_SELECTION_BUFFER_POINTER:
 	case GL_FEEDBACK_BUFFER_POINTER:

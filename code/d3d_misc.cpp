@@ -30,6 +30,9 @@
 
 OPENGL_API void WINAPI glClear( GLbitfield mask )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DGlobal.initialized) {
 		D3DGlobal.lastError = E_FAIL;
 		return;
@@ -44,6 +47,9 @@ OPENGL_API void WINAPI glClear( GLbitfield mask )
 }
 OPENGL_API void WINAPI glClearColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD da = (DWORD)(alpha * 255);
 	DWORD dr = (DWORD)(red * 255);
 	DWORD dg = (DWORD)(green * 255);
@@ -52,23 +58,39 @@ OPENGL_API void WINAPI glClearColor( GLclampf red, GLclampf green, GLclampf blue
 }
 OPENGL_API void WINAPI glClearDepth( GLclampd depth )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.DepthBufferState.clearDepth = (float)depth;
 }
 OPENGL_API void WINAPI glClearStencil( GLint s )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.StencilBufferState.clearStencil = s;
 }
 OPENGL_API void WINAPI glClearIndex( GLfloat )
 {
-	// d3d doesn't support color index mode
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glClearIndex: d3d doesn't support color index mode\n");
+	}
 }
 OPENGL_API void WINAPI glClearAccum( GLfloat, GLfloat, GLfloat, GLfloat )
 {
-	// d3d doesn't support accumulator
-	logPrintf("WARNING: glClearAccum: accumulator is not supported\n");
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glClearAccum: d3d doesn't support accumulator\n");
+	}
 }
 OPENGL_API void WINAPI glColorMask( GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD mask = 0;
 	if (red) mask |= D3DCOLORWRITEENABLE_RED;
 	if (green) mask |= D3DCOLORWRITEENABLE_GREEN;
@@ -81,6 +103,9 @@ OPENGL_API void WINAPI glColorMask( GLboolean red, GLboolean green, GLboolean bl
 }
 OPENGL_API void WINAPI glCullFace( GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (D3DState.PolygonState.cullMode != mode) {
 		D3DState.PolygonState.cullMode = mode;
 		D3DState_SetCullMode();
@@ -88,6 +113,9 @@ OPENGL_API void WINAPI glCullFace( GLenum mode )
 }
 OPENGL_API void WINAPI glFrontFace( GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (D3DState.PolygonState.frontFace != mode) {
 		D3DState.PolygonState.frontFace = mode;
 		D3DState_SetCullMode();
@@ -95,6 +123,9 @@ OPENGL_API void WINAPI glFrontFace( GLenum mode )
 }
 OPENGL_API void WINAPI glDepthFunc( GLenum func )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD dfunc = UTIL_GLtoD3DCmpFunc(func);
 	if (dfunc != D3DState.DepthBufferState.depthTestFunc) {
 		D3DState.DepthBufferState.depthTestFunc = dfunc;
@@ -103,6 +134,9 @@ OPENGL_API void WINAPI glDepthFunc( GLenum func )
 }
 OPENGL_API void WINAPI glDepthMask( GLboolean flag )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (D3DState.DepthBufferState.depthWriteMask != flag) {
 		D3DState.DepthBufferState.depthWriteMask = flag;
 		D3DState_SetRenderState( D3DRS_ZWRITEENABLE, flag );
@@ -110,6 +144,9 @@ OPENGL_API void WINAPI glDepthMask( GLboolean flag )
 }
 OPENGL_API void WINAPI glDepthRange( GLclampd zNear, GLclampd zFar )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	D3DState.viewport.MinZ = (float)zNear;
 	D3DState.viewport.MaxZ = (float)zFar;
 	if (!D3DGlobal.initialized) {
@@ -121,20 +158,37 @@ OPENGL_API void WINAPI glDepthRange( GLclampd zNear, GLclampd zFar )
 }
 OPENGL_API void WINAPI glIndexMask( GLuint )
 {
-	// d3d doesn't support color index mode
+	static bool warningPrinted = false;
+	if( !warningPrinted ) {
+		warningPrinted = true;
+		logPrintf( "WARNING: glIndexMask: d3d doesn't support color index mode\n" );
+	}	
 }
 OPENGL_API void WINAPI glDrawBuffer( GLenum )
 {
+	static bool warningPrinted = false;
+	if( !warningPrinted ) {
+		warningPrinted = true;
+		logPrintf( "WARNING: glDrawBuffer: d3d doesn't support front buffer drawing\n" );
+	}	
 	// d3d doesn't like us messing with the front buffer, so here
 	// we just silently ignore requests to change the draw buffer
 }
 OPENGL_API void WINAPI glReadBuffer( GLenum )
 {
+	static bool warningPrinted = false;
+	if( !warningPrinted ) {
+		warningPrinted = true;
+		logPrintf( "WARNING: glReadBuffer: d3d doesn't support front buffer reading\n" );
+	}	
 	// d3d doesn't like us messing with the front buffer, so here
 	// we just silently ignore requests to change the draw buffer
 }
 OPENGL_API void WINAPI glPolygonMode( GLenum face, GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (face != GL_FRONT_AND_BACK) {
 		logPrintf("WARNING: glPolygonMode: only GL_FRONT_AND_BACK is supported\n");
 	}
@@ -148,6 +202,9 @@ OPENGL_API void WINAPI glPolygonMode( GLenum face, GLenum mode )
 }
 OPENGL_API void WINAPI glPolygonOffset( GLfloat factor, GLfloat units )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	//WG: not sure about these values, but it solved the decals looking wrong from a distance in Wolf
 	D3DState.PolygonState.depthBiasFactor = factor; //-factor * 0.0025f;
 	D3DState.PolygonState.depthBiasUnits = units / 250000.0f; //units * 0.000125f;
@@ -187,6 +244,9 @@ OPENGL_API void WINAPI glLineWidth( GLfloat )
 }
 OPENGL_API void WINAPI glShadeModel( GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	const DWORD dmode = (mode == GL_FLAT) ? D3DSHADE_FLAT : D3DSHADE_GOURAUD;
 
 	if (dmode != D3DState.LightingState.shadeMode) {
@@ -196,6 +256,9 @@ OPENGL_API void WINAPI glShadeModel( GLenum mode )
 }
 OPENGL_API void WINAPI glPointSize( GLfloat size )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	size = QINDIEGL_MAX( QINDIEGL_MIN( size, D3DGlobal.hD3DCaps.MaxPointSize ), 1.0f );
 	if (D3DState.PointState.pointSize != size) {
 		D3DState.PointState.pointSize = size;
@@ -204,8 +267,11 @@ OPENGL_API void WINAPI glPointSize( GLfloat size )
 }
 OPENGL_API void WINAPI glAccum( GLenum, GLfloat )
 {
-	// d3d doesn't support accumulator
-	logPrintf("WARNING: glAccum: accumulator is not supported\n");
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glClearAccum: d3d doesn't support accumulator\n");
+	}
 }
 OPENGL_API void WINAPI glFlush()
 {
@@ -217,6 +283,9 @@ OPENGL_API void WINAPI glFinish()
 }
 OPENGL_API void WINAPI glViewport( GLint x, GLint y, GLsizei width, GLsizei height )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	// translate from OpenGL bottom-left to D3D top-left
 	y = D3DGlobal.hCurrentMode.Height - (height + y);
 
@@ -281,6 +350,9 @@ OPENGL_API void WINAPI glViewport( GLint x, GLint y, GLsizei width, GLsizei heig
 }
 OPENGL_API void WINAPI glScissor( GLint x, GLint y, GLsizei width, GLsizei height )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	// translate from OpenGL bottom-left to D3D top-left
 	y = D3DGlobal.hCurrentMode.Height - (height + y);
 
@@ -298,12 +370,19 @@ OPENGL_API void WINAPI glScissor( GLint x, GLint y, GLsizei width, GLsizei heigh
 	if (FAILED(hr)) D3DGlobal.lastError = hr;
 }
 OPENGL_API void WINAPI glDebugEntry( DWORD, DWORD )
-{
+{	
 	//what the hell is that?
+	static bool warningPrinted = false;
+	if (!warningPrinted) {
+		warningPrinted = true;
+		logPrintf("WARNING: glDebugEntry is not supported\n");
+	}
 }
 OPENGL_API void WINAPI glPushDebugGroup( GLenum source, GLuint id, GLsizei length, const char* message )
 {
 	_CRT_UNUSED( source ); _CRT_UNUSED( length );
+
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
 
 	static WCHAR wmessage[2048];
 	if ( D3DGlobal.dbgBeginEvent )
@@ -315,6 +394,8 @@ OPENGL_API void WINAPI glPushDebugGroup( GLenum source, GLuint id, GLsizei lengt
 }
 OPENGL_API void WINAPI glPopDebugGroup( void )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if ( D3DGlobal.dbgEndEvent )
 		D3DGlobal.dbgEndEvent();
 }

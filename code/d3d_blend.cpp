@@ -32,6 +32,9 @@
 
 OPENGL_API void WINAPI glAlphaFunc( GLenum func, GLclampf ref )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD dfunc = UTIL_GLtoD3DCmpFunc(func);
 	if (dfunc != D3DState.ColorBufferState.alphaTestFunc) {
 		D3DState.ColorBufferState.alphaTestFunc = dfunc;
@@ -47,6 +50,9 @@ OPENGL_API void WINAPI glAlphaFunc( GLenum func, GLclampf ref )
 
 OPENGL_API void WINAPI glBlendFunc( GLenum sfactor, GLenum dfactor )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (D3DState.ColorBufferState.glBlendSrc != sfactor) {
 		D3DState.ColorBufferState.glBlendSrc = sfactor;
 		DWORD sfunc = UTIL_GLtoD3DBlendFunc(sfactor);
@@ -84,6 +90,9 @@ OPENGL_API void WINAPI glBlendFunc( GLenum sfactor, GLenum dfactor )
 
 OPENGL_API void WINAPI glBlendColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD da = (DWORD)(alpha * 255);
 	DWORD dr = (DWORD)(red * 255);
 	DWORD dg = (DWORD)(green * 255);
@@ -103,6 +112,9 @@ OPENGL_API void WINAPI glBlendColor( GLclampf red, GLclampf green, GLclampf blue
 
 OPENGL_API void WINAPI glBlendEquation( GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	DWORD func = UTIL_GLtoD3DBlendOp(mode);
 	if (D3DState.ColorBufferState.alphaBlendOp != func) {
 		D3DState.ColorBufferState.alphaBlendOp = func;
@@ -117,6 +129,9 @@ OPENGL_API void WINAPI glLogicOp( GLenum )
 
 OPENGL_API void WINAPI glFogfv( GLenum pname, const GLfloat *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (pname) {
 	case GL_FOG_MODE:
 		switch ((GLenum)params[0]) {

@@ -32,6 +32,9 @@
 
 OPENGL_API void WINAPI glClipPlane( GLenum plane,  const GLdouble *equation )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	int planeIndex = plane - GL_CLIP_PLANE0;
 	if (planeIndex < 0 || planeIndex >= IMPL_MAX_CLIP_PLANES) {
 		D3DGlobal.lastError = E_INVALIDARG;
@@ -54,6 +57,9 @@ OPENGL_API void WINAPI glClipPlane( GLenum plane,  const GLdouble *equation )
 
 OPENGL_API void WINAPI glGetClipPlane( GLenum plane, GLdouble *equation )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	int planeIndex = plane - GL_CLIP_PLANE0;
 	if (planeIndex < 0 || planeIndex >= IMPL_MAX_CLIP_PLANES) {
 		D3DGlobal.lastError = E_INVALIDARG;

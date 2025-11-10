@@ -45,6 +45,8 @@ static bool cpuid( unsigned long function, unsigned long& out_eax, unsigned long
 
 void D3DGlobal_CPU_Detect()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	unsigned long p1, p2, p3, p4;
 	char szVendorID[13];
 	memset( szVendorID, 0, sizeof(szVendorID) );
