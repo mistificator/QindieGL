@@ -45,7 +45,7 @@ D3DState_t & D3DStateForContextIndex( size_t index )
 
 D3DState_t & D3DStateForContext( HGLRC hGLRC )
 {
-	return D3DStateForContextIndex( D3DContexIndex ( hGLRC ) );
+	return D3DStateForContextIndex( D3DContextIndex ( hGLRC ) );
 }
 
 static void D3DStatePush(  size_t index, D3DState_t && state, GLbitfield mask, GLbitfield clientMask )
@@ -984,7 +984,7 @@ void D3DState_SetDefaults()
 OPENGL_API void WINAPI glPushAttrib( GLbitfield mask )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
-	const size_t contextIndex = D3DContexIndex( D3DGlobal.hGLRC );
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
 	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
 
 	D3DState_t D3DStateCopy;
@@ -996,7 +996,7 @@ OPENGL_API void WINAPI glPushAttrib( GLbitfield mask )
 OPENGL_API void WINAPI glPushClientAttrib( GLbitfield mask )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
-	const size_t contextIndex = D3DContexIndex( D3DGlobal.hGLRC );
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
 	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
 
 	D3DState_t D3DStateCopy;
@@ -1008,7 +1008,7 @@ OPENGL_API void WINAPI glPushClientAttrib( GLbitfield mask )
 OPENGL_API void WINAPI glPopAttrib()
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
-	const size_t contextIndex = D3DContexIndex( D3DGlobal.hGLRC );
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
 
 	if (contextIndex >= D3D_CONTEXTS_COUNT || D3DStates[ contextIndex ].size() <= 1) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
@@ -1036,7 +1036,7 @@ OPENGL_API void WINAPI glPopAttrib()
 OPENGL_API void WINAPI glPopClientAttrib()
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
-	const size_t contextIndex = D3DContexIndex( D3DGlobal.hGLRC );
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
 
 	if (contextIndex >= D3D_CONTEXTS_COUNT || D3DStates[ contextIndex ].size() <= 1) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;

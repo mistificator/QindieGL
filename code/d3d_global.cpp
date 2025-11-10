@@ -52,29 +52,24 @@ static mINI::INIFile g_inifile(_T(""));
 static mINI::INIStructure g_iniconf;
 static bool g_iniavailable = false;
 
-std::tstring g_path;
+std::tstring D3DAppPath()
+{
+    static std::tstring g_path = []()
+    {
+        TCHAR buf[MAX_PATH];
+        GetCurrentDirectory(MAX_PATH, buf);
+        GetModuleFileName( NULL, buf, MAX_PATH );
+        * _tcsrchr( buf, '\\' ) = '\0';
+        std::tstring path = buf;
+        path += _T("\\");
 
-static bool inited = [](){
-	TCHAR buf[MAX_PATH];
-	GetCurrentDirectory(MAX_PATH, buf);
-	GetModuleFileName( NULL, buf, MAX_PATH );
-	* _tcsrchr( buf, '\\' ) = '\0';
-	g_path = buf;
-	g_path += _T("\\");
+        g_inifile = { path + _T( WRAPPER_GL_SHORT_NAME_STRING ) _T( ".ini" ) };
+		g_iniavailable = g_inifile.read(g_iniconf);
 
-	g_inifile = { g_path + _T( WRAPPER_GL_SHORT_NAME_STRING ) _T( ".ini" ) };
-	if (g_inifile.read(g_iniconf))
-	{
-		logPrintf( "ini file found at %s\n", buf );
-		g_iniavailable = true;
-	}
-	else
-	{
-		logPrintf( "ini file not found at %s\n", buf );
-		g_iniavailable = false;
-	}
-	return true;
-}();
+        return path;
+    }();
+    return g_path;
+};
 
 
 static BOOL D3DGlobal_InitializeDirect3D( void );
@@ -111,9 +106,9 @@ void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals )
 		matrix_detect_configuration_reset();
 }
 
-void D3DGlobal_Reset( void )
+void D3DGlobal_Reset( D3DGlobal_t * D3DGlobalPtrLocal )
 {
-	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtrLocal;
 
 	D3DGlobal.skipCopyImage = 5;
 
@@ -264,7 +259,7 @@ void D3DGlobal_Cleanup( D3DGlobal_t * D3DGlobalPtrLocal, bool cleanupAll )
 	if (cleanupAll) {
 		// some invalid parms may cause D3D to be corrupted
 		// and crash upon release; so don't release.
-		/*
+#if 1
 		if (D3DGlobal.pD3D) {
 			D3DGlobal.pD3D->Release();
 			D3DGlobal.pD3D = nullptr;
@@ -273,7 +268,7 @@ void D3DGlobal_Cleanup( D3DGlobal_t * D3DGlobalPtrLocal, bool cleanupAll )
 			FreeLibrary(D3DGlobal.hD3DDll);
 			D3DGlobal.hD3DDll = nullptr;
 		}
-		*/
+#endif
 	}
 }
 
@@ -753,9 +748,12 @@ extern int D3DGlobal_GetResolutions(resolution_info_t *resolutions, int count)
 	const int minwidth = 800;
 	const int minheight = 600;
 
-	if (!D3DGlobal.pD3D) {
+	// if (!D3DGlobal.pD3D) 
+	{
 		if ( ! D3DGlobal_InitializeDirect3D() )
+		{
 			return 0;
+		}
 	}
 
 	//UINT adapter_count = D3DGlobal.pD3D->GetAdapterCount();
@@ -897,7 +895,7 @@ static bool D3DGlobal_SetupPresentParams( int width, int height, int bpp, BOOL w
 
 #define D3D_CONTEXT_MAGIC	0xBEEF
 
-size_t D3DContexIndex( HGLRC hglrc )
+size_t D3DContextIndex( HGLRC hglrc )
 {
 	return hglrc - (HGLRC)D3D_CONTEXT_MAGIC;
 }
@@ -906,10 +904,40 @@ static BOOL D3DGlobal_InitializeDirect3D( void )
 {
 	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
 
-	if ( nullptr == (D3DGlobal.hD3DDll = LoadLibrary( (g_path + _T( "d3d9.dll" )).c_str() )) ) {
+	static int skip = 0; // TEST
+	--skip;
+
+#if 0	
+	if ( skip == 0 )
+	{
+		for (size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex)
+		{
+			D3DGlobal_t & D3DGlobal = D3DGlobals[ contextIndex ];
+			if ( D3DGlobal.pD3D )
+			{
+				D3DGlobal_Cleanup( & D3DGlobal, true );
+			}
+		}
+	}
+#endif
+
+	if (D3DGlobal.pD3D)
+	{
+		return TRUE;
+	}
+
+    if ( nullptr == (D3DGlobal.hD3DDll = LoadLibraryEx( 
+		skip <= 0 ? (D3DAppPath() + _T( "d3d9.dll" )).c_str() : _T( "d3d9.dll" ),
+		NULL,
+		skip <= 0 ? LOAD_LIBRARY_SEARCH_DEFAULT_DIRS : LOAD_LIBRARY_SEARCH_SYSTEM32 ))
+	) 
+	{
 		logPrintf( "wglCreateContext: failed to load d3d9.dll\n" );
 		return 0;
 	}
+	TCHAR moduleName[MAX_PATH];
+	GetModuleFileName( D3DGlobal.hD3DDll, moduleName, MAX_PATH );
+	logPrintf( "wglCreateContext: loaded %s\n", moduleName );
 	pfnDirect3DCreate9 d3dCreateFn = (pfnDirect3DCreate9)GetProcAddress( D3DGlobal.hD3DDll, "Direct3DCreate9" );
 	if ( !d3dCreateFn ) {
 		logPrintf( "wglCreateContext: failed to get address of \"Direct3DCreate9\" from d3d9.dll\n" );
@@ -977,7 +1005,16 @@ static BOOL D3DGlobal_InitializeDirect3D( void )
 
 OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 {
-	//logPrintf("wrap_wglCreateContext( %x )\n", hdc);
+	logPrintf("wglCreateContext: HDC ( %x )\n", hdc);
+
+	for (size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+	{
+		if ( D3DGlobals[contextIndex].hDC == hdc && D3DGlobals[contextIndex].hGLRC )
+		{
+			logPrintf("wglCreateContext: context for HDC( %x) was already created\n", hdc);
+			return D3DGlobals[contextIndex].hGLRC;
+		}
+	}
 
 	size_t contextIndex = 0; 
 	for ( ; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
@@ -987,11 +1024,13 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 			break;
 		}
 	}
-	if ( contextIndex == D3D_CONTEXTS_COUNT )	//don't create multiple contexts
+	if ( contextIndex == D3D_CONTEXTS_COUNT )
 	{
 		logPrintf("wglCreateContext: attempt to create additional context, ignored\n");
 		return 0;
 	}
+
+	logPrintf( "wglCreateContext create context %u\n", contextIndex );
 
 	D3DGlobal_t & D3DGlobal = D3DGlobals[contextIndex];
 
@@ -1003,14 +1042,19 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	}
 
 	// initialize direct3d
-	if (!D3DGlobal.pD3D) {
+	// if (!D3DGlobal.pD3D) 
+	{
 		if ( ! D3DGlobal_InitializeDirect3D() )
+		{
 			return 0;
+		}
 	}
 
 	// if a device was previously set up, return TRUE
 	if (D3DGlobal.pDevice) 
 		return D3DGlobal.hGLRC;
+
+	logPrintf( "wglCreateContext cleanup\n" );
 
 	D3DGlobal_Cleanup( &D3DGlobal, false );
 	D3DGlobal_Init( &D3DGlobal, false );
@@ -1119,10 +1163,12 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 			isWindowed = 1;
 			if (!D3DGlobal_SetupPresentParams(clientrect.right, clientrect.bottom, D3DGlobal.iBPP, isWindowed)) {
 				D3DGlobal.lastError = E_INVALIDARG;
+				logPrintf("wglCreateContext: D3DGlobal_SetupPresentParams failed with error '%s'\n", DXGetErrorString(D3DGlobal.lastError));
 				return 0;
 			}
 		} else {
 			D3DGlobal.lastError = E_INVALIDARG;
+			logPrintf("wglCreateContext: D3DGlobal_SetupPresentParams failed with error '%s'\n", DXGetErrorString(D3DGlobal.lastError));
 			return 0;
 		}
 	}
@@ -1138,16 +1184,27 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	// such as timeGetTime (with timeBeginTime (1)); by default Quake's times *ARE* prone to FPU drift as they
 	// use doubles for storing the last time, which gradually creeps up to be nearer to the current time each
 	// frame.  Not using doubles for the stored times (i.e. switching them all to floats) would also help here.
+
+	UINT adapterIndex = 0;
+	for ( ; adapterIndex < D3DGlobal.pD3D->GetAdapterCount(); ++adapterIndex )
+	{
+		D3DADAPTER_IDENTIFIER9 identifier;
+
+		D3DGlobal.pD3D->GetAdapterIdentifier( adapterIndex, 0, & identifier );
+		logPrintf( "wglCreateContext: adapter %s %s\n", identifier.DeviceName, identifier.Description );			
+	}
+	--adapterIndex;
+
 	logPrintf("wglCreateContext: creating pure device with hardware vertex processing\n");
-	hr = D3DGlobal.pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
+	hr = D3DGlobal.pD3D->CreateDevice( adapterIndex, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
 									   D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE | D3DCREATE_DISABLE_DRIVER_MANAGEMENT | D3DCREATE_PUREDEVICE,
 									   &D3DGlobal.hPresentParams, &D3DGlobal.pDevice );
 
 	if (FAILED(hr)) {
 		logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString(hr));
 		logPrintf("wglCreateContext: creating device with hardware vertex processing\n");
-	
-		hr = D3DGlobal.pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
+		
+		hr = D3DGlobal.pD3D->CreateDevice( adapterIndex, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
 										   D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE | D3DCREATE_DISABLE_DRIVER_MANAGEMENT,
 										   &D3DGlobal.hPresentParams, &D3DGlobal.pDevice );
 
@@ -1156,7 +1213,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 			logPrintf("wglCreateContext: CreateDevice failed with error '%s'\n", DXGetErrorString(hr));
 			logPrintf("wglCreateContext: creating device with software vertex processing\n");
 
-			hr = D3DGlobal.pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
+			hr = D3DGlobal.pD3D->CreateDevice( adapterIndex, D3DDEVTYPE_HAL, D3DGlobal.hWnd, 
 											   D3DCREATE_SOFTWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE | D3DCREATE_DISABLE_DRIVER_MANAGEMENT,
 											   &D3DGlobal.hPresentParams, &D3DGlobal.pDevice );
 			if (FAILED(hr)) {
@@ -1349,7 +1406,7 @@ void D3DGlobal_GetCamera(D3DXMATRIX *camera)
 
 OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
 {
-	const size_t contextIndex = D3DContexIndex( hglrc );
+	const size_t contextIndex = D3DContextIndex( hglrc );
 	
 	if (contextIndex >= D3D_CONTEXTS_COUNT || !D3DGlobals[contextIndex].hGLRC) {
 		logPrintf("wglDeleteContext: called twice, skipping second call\n");
@@ -1364,11 +1421,10 @@ OPENGL_API BOOL WINAPI wrap_wglDeleteContext( HGLRC hglrc )
 	}
 
 	logPrintf("wglDeleteContext: deleting rendering context\n");
-
+	
 	D3DGlobal.hGLRC = (HGLRC)0;
 	D3DGlobal_Cleanup( & D3DGlobal, false );
 
-	// success
 	return TRUE;
 }
 
@@ -1390,7 +1446,7 @@ OPENGL_API BOOL WINAPI wrap_wglMakeCurrent(HDC hdc, HGLRC hglrc)
 {
 	//logPrintf("wrap_wglMakeCurrent( %x, %x )\n", hdc, hglrc);
 
-	const size_t contextIndex = D3DContexIndex( hglrc );
+	const size_t contextIndex = D3DContextIndex( hglrc );
 
 	if (contextIndex < D3D_CONTEXTS_COUNT && hdc != nullptr) {
 
@@ -1444,7 +1500,7 @@ OPENGL_API BOOL WINAPI wrap_wglMakeCurrent(HDC hdc, HGLRC hglrc)
 				D3DGlobal.deviceLost = true;
 			} else if (hr == D3DERR_DEVICENOTRESET) {
 				logPrintf("wrap_wglMakeCurrent: D3DERR_DEVICENOTRESET\n");
-				D3DGlobal_Reset();
+				D3DGlobal_Reset( & D3DGlobal );
 			}
 		}
 	}
@@ -1483,7 +1539,7 @@ OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 
 		case D3DERR_DEVICENOTRESET:
 			// device is ready to be reset
-			D3DGlobal_Reset();
+			D3DGlobal_Reset( & D3DGlobal );
 			break;
 
 		default:

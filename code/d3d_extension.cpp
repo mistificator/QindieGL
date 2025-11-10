@@ -38,6 +38,18 @@ OPENGL_API const char* WINAPI wglGetExtensionsStringARB( HDC )
 	return D3DGlobal.szWExtensions;
 }
 
+extern OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc );
+
+OPENGL_API HGLRC WINAPI wglCreateContextAttribsARB( HDC hDC, HGLRC hShareContext, const int *attribList )
+{
+	HGLRC hContext = wrap_wglCreateContext( hDC );
+	if ( hShareContext )
+	{
+		// something to copy state here?
+	}
+	return hContext;
+}
+
 typedef struct glext_entry_point_s
 {
 	const char *name;
@@ -182,6 +194,11 @@ static glext_entry_point_t glext_EntryPoints[] =
 
 	//WGL_ARB_extensions_string
 	WGL_EXT_ENTRY_POINT( "ARB", "extensions_string", wglGetExtensionsStringARB, -2 ),
+
+	// WGL_ARB_create_context
+	// WGL_ARB_create_context_profile
+	WGL_EXT_ENTRY_POINT( "ARB", "create_context", wglCreateContextAttribsARB, -2 ),
+	WGL_EXT_ENTRY_POINT( "ARB", "create_context_profile", wglCreateContextAttribsARB, -2 ),
 
 	{ NULL, NULL }
 };

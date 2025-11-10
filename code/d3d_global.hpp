@@ -233,8 +233,7 @@ typedef struct resolution_info_s
 
 extern int D3DGlobal_GetResolutions( resolution_info_t* resolutions, int count );
 
-extern size_t D3DContexIndex( HGLRC hglrc );
-
-extern std::tstring g_path;
+extern size_t D3DContextIndex( HGLRC hglrc );
+extern std::tstring D3DAppPath();
 
 #endif //QINDIEGL_D3D_GLOBAL_H

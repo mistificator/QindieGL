@@ -33,7 +33,6 @@
 // This will help to debug the wrapper and monitor unimplemented functions.
 //==================================================================================
 static FILE *g_fpLog = nullptr;
-static const char s_szLogFileName[] = WRAPPER_GL_SHORT_NAME_STRING ".log";
 static char *log_string = nullptr;
 static const size_t c_LogStringSize = 8192; //8 kbytes
 
@@ -49,7 +48,7 @@ static void logInit()
 	}
 	log_string[c_LogStringSize -1] = 0;
 
-	if ( fopen_s( &g_fpLog, s_szLogFileName, "w" ) )
+	if ( _tfopen_s( &g_fpLog, (D3DAppPath() + _T( WRAPPER_GL_SHORT_NAME_STRING ".log" )).c_str(), _T( "w+" ) ) )
 		return;
 
 	char timeBuf[64];
