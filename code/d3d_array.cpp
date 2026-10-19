@@ -890,6 +890,9 @@ static void vbo_offset_to_ptr(D3DVAInfo* pVAInfo, const vbodata_t *bs)
 
 static void Consider_Active_VBO()
 {
+    D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+    D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	vbodata_t* bs = g_active_array_vbo;
 	if (bs && bs->dataptr && bs->usedsz > 0)
 	{

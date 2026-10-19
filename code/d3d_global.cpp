@@ -44,7 +44,7 @@
 // Initialize and set up global D3D vars
 //==================================================================================
 
-D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT] = { 0 };
+D3DGlobal_t D3DGlobals[D3D_CONTEXTS_COUNT] = {};
 D3DGlobal_t * D3DGlobalPtr = & D3DGlobals[0];
 
 static std::string g_gamename;
@@ -1855,6 +1855,18 @@ OPENGL_API void WINAPI glPNTrianglesfATI( GLenum pname, GLfloat param )
 	}	
 }
 
+OPENGL_API void WINAPI glPNTrianglesiATI( GLenum pname, GLint param )
+{
+    _CRT_UNUSED( pname ); _CRT_UNUSED( param );
+
+    static bool warningPrinted = false;
+
+    if (!warningPrinted) {
+        warningPrinted = true;
+        logPrintf("WARNING: glPNTrianglesiATI not supported\n");
+    }
+}
+
 void global_options_set(int id, void* data)
 {
 	enum
@@ -1863,6 +1875,7 @@ void global_options_set(int id, void* data)
 	};
 
 	const char* gamename = D3DGlobal_GetGameName();
+    D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
 
 	switch (id)
 	{

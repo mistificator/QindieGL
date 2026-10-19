@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "..\\code\\resource.h"
+#include "resource.h"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -80,9 +80,9 @@ END
 //
 
 #if SHADERS_FROM_SOURCE
-RES_ID_ORTHO_VS         RES_TYPE_SHADER_FILE                     "ortho_vs.hlsl"
+RES_ID_ORTHO_VS         RES_TYPE_SHADER_FILE                     "..\\code\\shaders\\ortho_vs.hlsl"
 
-RES_ID_ORTHO_PS         RES_TYPE_SHADER_FILE                     "ortho_ps.hlsl"
+RES_ID_ORTHO_PS         RES_TYPE_SHADER_FILE                     "..\\code\\shaders\\ortho_ps.hlsl"
 #else
 RES_ID_ORTHO_VS         RES_TYPE_SHADER_FILE                     "ortho_vs.cso"
 
