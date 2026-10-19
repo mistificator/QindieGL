@@ -1279,7 +1279,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 
 	//setup adapter info strings
 	D3DADAPTER_IDENTIFIER9 adapterInfo;
-	if( SUCCEEDED( D3DGlobal.pD3D->GetAdapterIdentifier( D3DADAPTER_DEFAULT, 0, &adapterInfo ) ) ) {
+	if( SUCCEEDED( D3DGlobal.pD3D->GetAdapterIdentifier( adapterIndex, 0, &adapterInfo ) ) ) {
 		D3DGlobal.szRendererName = UTIL_AllocString( adapterInfo.Description );
 	}
 
