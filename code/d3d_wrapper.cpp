@@ -32,8 +32,14 @@
 // Log all internal errors into text file.
 // This will help to debug the wrapper and monitor unimplemented functions.
 //==================================================================================
+
+// Define 10 MB in bytes
+#define MAX_LOG_SIZE (10 * 1024 * 1024) 
+
+// Helper function to get the current file size
+static long get_file_size(const char* filename);
+
 static FILE *g_fpLog = nullptr;
-static const char s_szLogFileName[] = WRAPPER_GL_SHORT_NAME_STRING ".log";
 static char *log_string = nullptr;
 static const size_t c_LogStringSize = 8192; //8 kbytes
 
@@ -49,7 +55,7 @@ static void logInit()
 	}
 	log_string[c_LogStringSize -1] = 0;
 
-	if ( fopen_s( &g_fpLog, s_szLogFileName, "w" ) )
+	if ( _tfopen_s( &g_fpLog, (D3DAppPath() + _T( WRAPPER_GL_SHORT_NAME_STRING ".log" )).c_str(), _T( "w+" ) ) )
 		return;
 
 	char timeBuf[64];
@@ -106,6 +112,25 @@ void logPrintf( const char *fmt, ... )
 	fflush(g_fpLog);
 }
 
+// Helper function to get the current file size
+static long get_file_size(const char* filename) {
+	FILE* fp = fopen(filename, "r");
+	if (fp == NULL) {
+		// File doesn't exist yet, or we don't have permission to read it.
+		// Returning 0 ensures we will create it using append mode later.
+		return 0;
+	}
+
+	// Jump to the end of the file
+	fseek(fp, 0, SEEK_END);
+
+	// Get the current byte offset (which equals the file size)
+	long size = ftell(fp);
+
+	fclose(fp);
+	return size;
+}
+
 #define PATH_SZ 1024
 static TCHAR exename[PATH_SZ] = { 0 };
 static TCHAR dllname[PATH_SZ] = { 0 };
@@ -148,7 +173,7 @@ BOOL APIENTRY DllMain( HMODULE hModule, DWORD ul_reason_for_call, LPVOID )
 					TCHAR* name = _tcsrchr(exename, _T('\\'));
 					if (name) {
 						name++;
-						int count = _tclen( name );
+						size_t count = _tclen( name );
 						TCHAR* tmp = _tcsrchr(exename, _T('.'));
 						if (tmp) {
 							count = tmp - name;
@@ -160,13 +185,19 @@ BOOL APIENTRY DllMain( HMODULE hModule, DWORD ul_reason_for_call, LPVOID )
 				ercd = GetModuleFileName(hModule, dllname, PATH_SZ);
 			}
 			D3DGlobal_StoreGameName(game_cfg.c_str());
-			D3DGlobal_Init( true );
-			D3DGlobal.hModule = hModule;
+			for ( size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+			{
+				D3DGlobal_Init( & D3DGlobals[contextIndex], true );
+				D3DGlobals[contextIndex].hModule = hModule;
+			}
 			hook_do_init(exename, dllname, game_cfg.c_str());
 			break;
 		case DLL_PROCESS_DETACH:
 			//logPrintf("DllMain( DLL_PROCESS_DETACH )\n");
-			D3DGlobal_Cleanup( true );
+			for ( size_t contextIndex = 0; contextIndex < D3D_CONTEXTS_COUNT; ++contextIndex )
+			{
+				D3DGlobal_Cleanup( & D3DGlobals[contextIndex], true );
+			}
 			hook_do_deinit();
 			logShutdown();
 			break;

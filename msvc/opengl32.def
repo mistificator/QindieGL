@@ -341,6 +341,14 @@ EXPORTS
 	glVertex4sv
 	glVertexPointer 
 	glViewport
+	glBindBufferARB
+	glGenBuffersARB
+	glDeleteBuffersARB
+	glIsBufferARB
+	glBufferDataARB
+	glBufferSubDataARB
+	glMapBufferARB
+	glUnmapBufferARB
 	wglChoosePixelFormat = wrap_wglChoosePixelFormat
 	wglCopyContext = wrap_wglCopyContext
 	wglCreateContext = wrap_wglCreateContext
@@ -366,5 +374,14 @@ EXPORTS
 	wglUseFontOutlinesA = wrap_wglUseFontOutlinesA
 	wglUseFontOutlinesW = wrap_wglUseFontOutlinesW
 	matrix_print_s
+	matrix_update_camera
+	matrix_preferred_address
 	DXGetErrorStringA
 	logPrintf
+	global_options_set
+	rmx_begin_loading_map = qdx_begin_loading_map
+	rmx_setplayerpos = rmx_setplayerpos
+	rmx_set_game_api = rmx_set_game_api
+	rmx_flashlight_enable = rmx_flashlight_enable
+	rmx_light_add = qdx_light_add
+	rmx_lights_clear = qdx_lights_clear

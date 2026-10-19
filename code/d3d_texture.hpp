@@ -73,7 +73,8 @@ public:
 	void SetTarget( GLenum target ) { m_target = target; }
 	void SetMipmapAutogen( GLboolean value ) { m_autogenMipmaps = value; }
 	void SetBorderColor( D3DCOLOR value ) { m_borderColor = value; }
-	void SetAnisotropy( GLuint value ) { m_anisotropy = QINDIEGL_MIN( D3DGlobal.hD3DCaps.MaxAnisotropy, QINDIEGL_MAX( 1, value ) ); }
+	void SetAnisotropy( GLuint value ) { 
+		D3DGlobal_t & D3DGlobal = * D3DGlobalPtr; m_anisotropy = QINDIEGL_MIN( D3DGlobal.hD3DCaps.MaxAnisotropy, QINDIEGL_MAX( 1, value ) ); }
 	void SetPriority( DWORD value ) { m_priority = value; }
 	void SetLodBias( GLfloat value ) { m_lodBias = value; }
 

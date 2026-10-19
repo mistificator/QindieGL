@@ -28,10 +28,42 @@
 #include "d3d_matrix_detection.hpp"
 #include <map>
 
-D3DState_t D3DState;
-static D3DState_t D3DStateCopy;
-static GLbitfield D3DStateCopyMask = 0;
-static GLbitfield D3DStateClientCopyMask = 0;
+std::list<D3DState_t> D3DStates[D3D_CONTEXTS_COUNT];
+static std::list<GLbitfield> D3DStateMask[D3D_CONTEXTS_COUNT];
+static std::list<GLbitfield> D3DStateClientMask[D3D_CONTEXTS_COUNT];
+
+D3DState_t & D3DStateForContextIndex( size_t index )
+{
+	if (D3DStates[ index ].empty())
+	{
+		D3DStates[ index ].push_back( {} );
+		D3DStateMask[ index ].push_back( 0 );
+		D3DStateClientMask[ index ].push_back( 0 );
+	}
+	return D3DStates[ index ].back();
+}
+
+D3DState_t & D3DStateForContext( HGLRC hGLRC )
+{
+	return D3DStateForContextIndex( D3DContextIndex ( hGLRC ) );
+}
+
+static void D3DStatePush(  size_t index, D3DState_t && state, GLbitfield mask, GLbitfield clientMask )
+{
+	D3DStates[ index ].push_front( std::move( state ) );
+	D3DStateMask[ index ].push_front( mask );
+	D3DStateClientMask[ index ].push_front( clientMask );
+}
+
+static void D3DStatePop(  size_t index )
+{
+	D3DStates[ index ].back() = std::move( D3DStates[ index ].front() );
+	D3DStates[ index ].pop_front();
+	D3DStateMask[ index ].back() = D3DStateMask[ index ].front();
+	D3DStateMask[ index ].pop_front();
+	D3DStateClientMask[ index ].back() = D3DStateClientMask[ index ].front();
+	D3DStateClientMask[ index ].pop_front();
+}
 
 extern void SelectTexGenFunc( int stage, int coord );
 
@@ -129,6 +161,9 @@ static void D3DState_Copy( const D3DState_t *src, D3DState_t *dst, GLbitfield ma
 
 void D3DState_SetCullMode()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DGlobal.pDevice) return;
 	HRESULT hr = S_OK;
 
@@ -145,6 +180,9 @@ void D3DState_SetCullMode()
 
 void D3DState_SetDepthBias()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DGlobal.pDevice) return;
 	HRESULT hr = S_OK;
 
@@ -161,6 +199,9 @@ void D3DState_SetDepthBias()
 
 bool D3DState_SetMatrixMode()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch ( D3DState.TransformState.matrixMode ) {
 		case GL_MODELVIEW:
 			D3DState.currentMatrixStack = D3DGlobal.modelviewMatrixStack;
@@ -181,6 +222,8 @@ bool D3DState_SetMatrixMode()
 
 void D3DState_AssureBeginScene()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+
 	if (!D3DGlobal.sceneBegan) {
 		HRESULT hr = D3DGlobal.pDevice->BeginScene();
 		if (FAILED(hr)) {
@@ -193,6 +236,9 @@ void D3DState_AssureBeginScene()
 
 static void D3DState_SetTransform()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	HRESULT hr;
 	assert( D3DGlobal.pD3D != nullptr );
 	assert( D3DGlobal.pDevice != nullptr );
@@ -251,16 +297,25 @@ static void D3DState_SetTransform()
 			if ( D3DGlobal_IsOrthoProjection() )
 			{
 				D3DGlobal.pDevice->SetVertexShader( D3DGlobal.orthoShaders.vs );
-				//D3DGlobal.pDevice->SetPixelShader( D3DGlobal.orthoShaders.ps );
+				D3DGlobal.pDevice->SetPixelShader( D3DGlobal.orthoShaders.ps );
 
+#if SHADERS_FROM_SOURCE
 				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "projectionMatrix", D3DGlobal.projectionMatrixStack->top());
 				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "worldMatrix", D3DGlobal.modelMatrixStack->top());
 				D3DGlobal.orthoShaders.constants->SetMatrix(D3DGlobal.pDevice, "viewMatrix", D3DGlobal.viewMatrixStack->top());
+#else
+				D3DGlobal.pDevice->SetVertexShaderConstantF(0, (*D3DGlobal.projectionMatrixStack->top()), 4);
+				D3DGlobal.pDevice->SetVertexShaderConstantF(4, (*D3DGlobal.viewMatrixStack->top()), 4);
+				D3DGlobal.pDevice->SetVertexShaderConstantF(8, (*D3DGlobal.modelMatrixStack->top()), 4);
+#endif
+
+				float texelOffset[4] = { -1.0f/D3DState.viewport.Width, 1.0f/D3DState.viewport.Height, 0.0f, 0.0f };
+				D3DGlobal.pDevice->SetVertexShaderConstantF(12, texelOffset, 1);
 			}
 			else
 			{
 				D3DGlobal.pDevice->SetVertexShader( NULL );
-				//D3DGlobal.pDevice->SetPixelShader( NULL );
+				D3DGlobal.pDevice->SetPixelShader( NULL );
 			}
 		}
 	}
@@ -271,7 +326,20 @@ static void D3DState_SetTransform()
 		for (int i = 0; i < IMPL_MAX_CLIP_PLANES; ++i) {
 			if (D3DState.TransformState.clipPlaneModified[i]) {
 				D3DState.TransformState.clipPlaneModified[i] = FALSE;
-				hr = D3DGlobal.pDevice->SetClipPlane( i, D3DState.TransformState.clipPlane[i] );
+				if (!matrix_detect_is_detection_enabled())
+				{
+					hr = D3DGlobal.pDevice->SetClipPlane( i, D3DState.TransformState.clipPlane[i] );
+				}
+				else
+				{
+					D3DXMATRIX viewTranspose;
+					D3DXMatrixTranspose(&viewTranspose, D3DGlobal.viewMatrixStack->top());
+
+					D3DXPLANE worldSpacePlane, eyeSpacePlane(D3DState.TransformState.clipPlane[i]);
+					D3DXPlaneTransform(&worldSpacePlane, &eyeSpacePlane, &viewTranspose);
+
+					hr = D3DGlobal.pDevice->SetClipPlane(i, worldSpacePlane);
+				}
 				if (FAILED(hr)) {
 					D3DGlobal.lastError = hr;
 					return;
@@ -283,6 +351,9 @@ static void D3DState_SetTransform()
 
 static void D3DState_SetLight()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DState.EnableState.lightingEnabled)
 		return;
 
@@ -344,6 +415,9 @@ static void D3DState_SetLight()
 
 static void D3DState_SetTextureEnvCombine( int stage, int sampler )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	const DWORD colorOp = UTIL_GLtoD3DTextureCombineOp( D3DState.TextureState.TextureCombineState[stage].colorOp, D3DState.TextureState.TextureCombineState[stage].colorScale );
 	const DWORD alphaOp = UTIL_GLtoD3DTextureCombineOp( D3DState.TextureState.TextureCombineState[stage].alphaOp, D3DState.TextureState.TextureCombineState[stage].alphaScale );
 
@@ -377,6 +451,9 @@ static void D3DState_SetTextureEnvCombine( int stage, int sampler )
 
 static void D3DState_SetTextureEnv( int stage, int sampler, eTexTypeInternal intformat )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 //	logPrintf("Stage %i, sampler %i: MODE 0x%x\n", stage, sampler, D3DState.TextureState.textureEnvMode[stage]);
 
 	switch (D3DState.TextureState.TextureCombineState[stage].envMode) {
@@ -448,8 +525,42 @@ static void D3DState_SetTextureEnv( int stage, int sampler, eTexTypeInternal int
 		D3DGlobal.pDevice->SetSamplerState( sampler, D3DSAMP_MIPMAPLODBIAS, UTIL_FloatToDword(D3DState.TextureState.textureLodBias[stage])  );
 }
 
+/*
+** ConvertTexMatrixToD3D9
+** Fixes 4x4 matrix for D3D9 2D texture coordinate generation (D3DTTFF_COUNT2)
+** by swapping row 3 and 4, and resetting columns 3 and 4 to safe identity values.
+*/
+static void ConvertTexMatrixToD3D9(const float in[16], float out[16]) {
+	// Row 1: U scale/shear
+	out[0] = in[0];
+	out[1] = in[1];
+	out[2] = 0.0f; // Reset Col 3
+	out[3] = 0.0f; // Reset Col 4
+
+	// Row 2: V scale/shear
+	out[4] = in[4];
+	out[5] = in[5];
+	out[6] = 0.0f; // Reset Col 3
+	out[7] = 0.0f; // Reset Col 4
+
+	// Row 3: D3D9 2D Translation (Pulled from input Row 4)
+	out[8] = in[12];
+	out[9] = in[13];
+	out[10] = 1.0f; // Z identity
+	out[11] = 0.0f; // W identity
+
+	// Row 4: Pulled from input Row 3
+	out[12] = in[8];
+	out[13] = in[9];
+	out[14] = 0.0f; // Z identity
+	out[15] = 1.0f; // W identity
+}
+
 void D3DState_SetTexture()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (!D3DState.TextureState.textureSamplerStateChanged)
 		return;
 
@@ -468,6 +579,7 @@ void D3DState_SetTexture()
 		if (matrixChanged) {
 			D3DState.textureMatrixModified[i] = false;
 			D3DStateMatrix& mat = D3DGlobal.textureMatrixStack[i]->top();
+#if 0
 			if ( !mat.is_identity() ||
 				D3DState.TextureState.transformEnabled )
 			{
@@ -484,6 +596,50 @@ void D3DState_SetTexture()
 					break;
 				}
 			}
+#else
+			if (!mat.is_identity())
+			{
+				D3DXMATRIX *transform = mat, local;
+				int numCoords = D3DState.ClientVertexArrayState.texCoordInfo[i].elementCount;
+				if (numCoords < 0) numCoords = 0;
+				if (numCoords > 4) numCoords = 4;
+
+				const DWORD flags[] = { D3DTTFF_DISABLE, D3DTTFF_COUNT1, D3DTTFF_COUNT2, D3DTTFF_COUNT3, D3DTTFF_COUNT4 };
+				DWORD transformFlags = flags[numCoords];
+
+				// For 2D coordinates, swap 3rd and 4th rows of the matrix, since DX9 fills-in the 3rd and 4th texCoord as { 1.0, 0.0 }
+				if (numCoords == 2)
+				{
+					ConvertTexMatrixToD3D9(&transform->m[0][0], &local.m[0][0]);
+					transform = &local;
+				}
+				// Restore projection ONLY for 3D/4D coordinates
+				if (numCoords == 4)
+				{
+					transformFlags |= D3DTTFF_PROJECTED;
+				}
+				// Enable texture transform (projected) for this specific sampler
+				D3DGlobal.pDevice->SetTextureStageState(currentSampler, D3DTSS_TEXTURETRANSFORMFLAGS, transformFlags);
+
+				hr = D3DGlobal.pDevice->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + currentSampler), transform);
+				if (FAILED(hr)) {
+					D3DGlobal.lastError = hr;
+					break;
+				}
+			}
+			else
+			{
+				// Disable texture transform since the matrix is identity
+				D3DGlobal.pDevice->SetTextureStageState(currentSampler, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+
+				// Although the transform is disabled, setting the identity matrix ensures consistent state
+				hr = D3DGlobal.pDevice->SetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + currentSampler), mat);
+				if (FAILED(hr)) {
+					D3DGlobal.lastError = hr;
+					break;
+				}
+			}
+#endif
 		}
 
 		D3DTextureObject *bestTexture( nullptr );
@@ -601,6 +757,9 @@ void D3DState_Check()
 
 void D3DState_Apply( GLbitfield mask )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (mask & GL_COLOR_BUFFER_BIT) {
 		D3DGlobal.pDevice->SetRenderState(D3DRS_ALPHAFUNC, D3DState.ColorBufferState.alphaTestFunc);
 		D3DGlobal.pDevice->SetRenderState(D3DRS_ALPHAREF, D3DState.ColorBufferState.alphaTestReference);
@@ -707,12 +866,12 @@ void D3DState_Apply( GLbitfield mask )
 
 void D3DState_SetDefaults()
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	assert( D3DGlobal.pD3D != nullptr );
 	assert( D3DGlobal.pDevice != nullptr );
 
-	D3DStateCopyMask = 0;
-	D3DStateClientCopyMask = 0;
-	memset( &D3DStateCopy, 0, sizeof(D3DStateCopy) );
 	memset( &D3DState, 0, sizeof(D3DState) );
 
 	D3DState.ColorBufferState.clearColor = D3DCOLOR_ARGB(0,0,0,0);
@@ -922,24 +1081,40 @@ void D3DState_SetDefaults()
 
 OPENGL_API void WINAPI glPushAttrib( GLbitfield mask )
 {
-	D3DStateCopyMask = mask;
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
+	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
+
+	D3DState_t D3DStateCopy;
 	D3DState_Copy( &D3DState, &D3DStateCopy, mask );
+
+	D3DStatePush( contextIndex, std::move(D3DStateCopy), mask, D3DStateClientMask[ contextIndex ].front() );
 }
 
 OPENGL_API void WINAPI glPushClientAttrib( GLbitfield mask )
 {
-	D3DStateClientCopyMask = mask;
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
+	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
+
+	D3DState_t D3DStateCopy;
 	D3DState_CopyClient( &D3DState, &D3DStateCopy, mask );
+
+	D3DStatePush( contextIndex, std::move(D3DStateCopy), D3DStateMask[ contextIndex ].front(), mask );
 }
 
 OPENGL_API void WINAPI glPopAttrib()
 {
-	if (!D3DStateCopyMask) {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
+
+	if (contextIndex >= D3D_CONTEXTS_COUNT || D3DStates[ contextIndex ].size() <= 1) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
 		return;
 	}
 
-	D3DState_Copy( &D3DStateCopy, &D3DState, D3DStateCopyMask );
+	D3DStatePop( contextIndex );
+	D3DState_t & D3DState = D3DStateForContextIndex( contextIndex );
 
 	D3DState.modelViewMatrixModified = TRUE;
 	D3DState.projectionMatrixModified = TRUE;
@@ -953,24 +1128,27 @@ OPENGL_API void WINAPI glPopAttrib()
 		D3DState.TextureState.textureEnvModeChanged[i] = TRUE;
 	}
 
-	D3DState_Apply( D3DStateCopyMask );
-
-	D3DStateCopyMask = 0;
+	D3DState_Apply( D3DStateMask[ contextIndex ].back() );
 }
 
 OPENGL_API void WINAPI glPopClientAttrib()
 {
-	if (!D3DStateClientCopyMask) {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	const size_t contextIndex = D3DContextIndex( D3DGlobal.hGLRC );
+
+	if (contextIndex >= D3D_CONTEXTS_COUNT || D3DStates[ contextIndex ].size() <= 1) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
 		return;
 	}
 
-	D3DState_CopyClient( &D3DStateCopy, &D3DState, D3DStateClientCopyMask );
-	D3DStateClientCopyMask = 0;
+	D3DStatePop( contextIndex );
 }
 
 static DWORD D3DState_IsEnabledState( GLenum cap )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (cap) {
 	case GL_ALPHA_TEST:
 		return D3DState.EnableState.alphaTestEnabled;
@@ -1085,6 +1263,9 @@ static DWORD D3DState_IsEnabledState( GLenum cap )
 
 static void D3DState_EnableDisableState( GLenum cap, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (cap) {
 	case GL_ALPHA_TEST:
 		D3DState.EnableState.alphaTestEnabled = value;
@@ -1101,6 +1282,10 @@ static void D3DState_EnableDisableState( GLenum cap, DWORD value )
 	case GL_DEPTH_TEST:
 		D3DState.EnableState.depthTestEnabled = value;
 		D3DState_SetRenderState( D3DRS_ZENABLE, D3DState.EnableState.depthTestEnabled );
+		if (D3DGlobal.settings.game.depthOffDisablesWrites && D3DState.DepthBufferState.depthWriteMask )
+		{
+			D3DState_SetRenderState(D3DRS_ZWRITEENABLE, value);
+		}
 		break;
 	case GL_DITHER:
 		D3DState.EnableState.ditherEnabled = value;
@@ -1327,6 +1512,9 @@ static void D3DState_EnableDisableState( GLenum cap, DWORD value )
 
 static inline void D3DState_ChangeVertexArrayStateBit( DWORD bit, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	if (value)
 		D3DState.ClientVertexArrayState.vertexArrayEnable |= bit;
 	else
@@ -1335,6 +1523,9 @@ static inline void D3DState_ChangeVertexArrayStateBit( DWORD bit, DWORD value )
 
 static void D3DState_EnableDisableClientState( GLenum cap, DWORD value )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch (cap) {
 	case GL_VERTEX_ARRAY:
 		D3DState_ChangeVertexArrayStateBit( VA_ENABLE_VERTEX_BIT, value );
@@ -1391,6 +1582,9 @@ OPENGL_API void WINAPI glDisableClientState( GLenum cap )
 
 OPENGL_API void WINAPI glHint(GLenum target,  GLenum mode)
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	switch( target )
 	{ 
 	case GL_PERSPECTIVE_CORRECTION_HINT:

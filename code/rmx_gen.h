@@ -14,9 +14,14 @@ void rmx_deinit_device();
 void qdx_begin_loading_map( const char* mapname );
 const char* qdx_get_active_map();
 void qdx_save_iniconf();
+void qdx_storemapconfint(const char* base, const char* valname, int value, bool inGlobal);
 void qdx_storemapconfflt( const char* base, const char* valname, float value, bool inGlobal = false );
+void qdx_storemapconfstr(const char* base, const char* valname, const char* value, bool inGlobal);
+int qdx_readmapconfint(const char* base, const char* valname);
 float qdx_readmapconfflt( const char* base, const char* valname, float default_val );
+int qdx_readmapconfstr(const char* base, const char* valname, char* out, int outsz);
 void rmx_setplayerpos( const float* origin, const float* direction );
+void rmx_frame_end();
 
 /*****************
 ** game interop **
@@ -36,7 +41,8 @@ typedef enum gameops_e
 	OP_SETVAR,
 	OP_EXECMD,
 	OP_CONPRINT,
-	OP_DEACTMOUSE
+	OP_DEACTMOUSE,
+	OP_GETNORMALSTHRESHVAL
 } gameops_t;
 typedef union gameparam_u
 {
@@ -44,16 +50,23 @@ typedef union gameparam_u
 	float fltval;
 	const char* strval;
 	const int* pintval;
-	gameparam_u() : intval( 0 ) {}
-	gameparam_u(int32_t p) : intval( p ) {}
-	gameparam_u(float p) : fltval( p ) {}
-	gameparam_u(const char* p) : strval( p ) {}
-	gameparam_u(const int* p) : pintval( p ) {}
+	const float* pfltval;
 } gameparam_t;
-typedef gameparam_t (__cdecl* game_api)(gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2);
+typedef union gameparamret_u
+{
+	int32_t intval;
+	float fltval;
+	char* strval;
+	int* pintval;
+	float* pfltval;
+} gameparamret_t;
+extern "C" {
+	typedef gameparamret_t(__cdecl* game_api)(gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2);
+}
 void rmx_set_game_api( game_api fn );
 void rmx_flashlight_enable( int val = -1 );
 void rmx_distant_light_radiance(float r, float g, float b, bool enabled);
+void rmx_distant_light_direction(float x, float y, float z, bool enabled);
 
 /**************************
 ** api for imgui interop **
@@ -68,6 +81,10 @@ float* qdx_4imgui_radiance_coronas_1f();
 float* qdx_4imgui_radius_dynamic_1f();
 float* qdx_4imgui_radius_dynamic_scale_1f();
 float* qdx_4imgui_radius_coronas_1f();
+float* qdx_4imgui_cylinder_axis_dynamic_3f();
+float* qdx_4imgui_cylinder_axis_coronas_3f();
+float* qdx_4imgui_cylinder_len_dynamic_1f();
+float* qdx_4imgui_cylinder_len_coronas_1f();
 float* qdx_4imgui_flashlight_radiance_1f(int idx);
 float* qdx_4imgui_flashlight_colors_3f(int idx);
 float* qdx_4imgui_flashlight_coneangles_1f(int idx);
@@ -89,6 +106,16 @@ int* qdx_4imgui_surface_aabb_selection( int *total );
 const char *qdx_4imgui_shader_info( int *value );
 void qdx_4imgui_surface_aabb_saveselection(const char *hint);
 
+float* rmx_4imgui_getnormalsthresh();
+
+//#define FRUSTUM_IMGUI
+
+#ifdef FRUSTUM_IMGUI
+float* qdx_4imgui_frustrumplane(int idx);
+float* qdx_4imgui_frustumdist(int idx);
+int* qdx_4imgui_frustumtype();
+int* qdx_4imgui_frustumoverride();
+#endif
 
 /***************
 ** Other utils *

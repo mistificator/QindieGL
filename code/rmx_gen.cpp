@@ -20,6 +20,10 @@ static BOOL g_ini_first_init = FALSE;
 static std::string active_map( "" );
 static game_api g_game_api = NULL;
 
+static int rmx_fallbacklight_delay = 0; //(60 * 3);
+static int rmx_fallbacklight_counter = 0;
+static int rmx_fallbacklight_state = 0;
+
 static void iniconf_first_init()
 {
 	if ( g_ini_first_init == FALSE )
@@ -76,7 +80,7 @@ void qdx_begin_loading_map( const char* mapname )
 	}
 
 	const char* ext = strrchr(mapname, '.');
-	int namelen = 0;
+	size_t namelen = 0;
 	if(ext)
 	{
 		namelen = ext - name;
@@ -95,17 +99,33 @@ void qdx_begin_loading_map( const char* mapname )
 	{
 		if ( remixOnline )
 		{
+			static float direction[3];
+			static float radiance[3];
+			int distant_handling = 0;
 			mINI::INIMap<std::string>* default_opts;
 			mINI::INIMap<std::string>* map_opts = 0;
 
 			// Apply RTX.conf options
-			snprintf( section, sizeof( section ), "rtxconf.%.*s", namelen, name );
+			snprintf( section, sizeof( section ), "rtxconf.%.*s", (uint32_t)namelen, name );
 			rmx_console_printf(PRINT_ALL, "RTX.conf section %s\n", section);
 			if ( g_iniconf.has( section ) )
 			{
 				map_opts = &g_iniconf[ section ];
 			}
 			default_opts = &g_iniconf[ "rtxconf.default" ];
+
+			if (rmx_fallbacklight_counter)
+			{
+				rmx_fallbacklight_counter = 0;
+				const char* key = "rtx.fallbackLightMode";
+				const char* value = "0";
+				rmx_console_printf(PRINT_ALL, "Setting option %s = %s\n", key, value);
+				remixapi_ErrorCode rercd = remixInterface.SetConfigVariable(key, value);
+				if (REMIXAPI_ERROR_CODE_SUCCESS != rercd)
+				{
+					rmx_console_printf(PRINT_ERROR, "RMX failed to set config var %d\n", rercd);
+				}
+			}
 
 			for ( auto it = default_opts->begin(); it != default_opts->end(); it++ )
 			{
@@ -115,6 +135,46 @@ void qdx_begin_loading_map( const char* mapname )
 				{
 					value = map_opts->operator[](key).c_str();
 				}
+
+				if (0 && 0 == strcmp(key, "rtx.fallbackLightRadiance"))
+				{
+					sscanf(value, "%f, %f, %f", &radiance[0], &radiance[1], &radiance[2]);
+					distant_handling |= 1;
+					if (distant_handling == 3)
+					{
+						distant_handling = 0;
+						const float origin[3] = { 0,0,0 };
+						qdx_light_add(LIGHT_DISTANT, 0, origin, direction, radiance, 0);
+					}
+					continue;
+				}
+				if (0 && 0 == strcmp(key, "rtx.fallbackLightDirection"))
+				{
+					sscanf(value, "%f, %f, %f", &direction[0], &direction[1], &direction[2]);
+					distant_handling |= 2;
+					if (distant_handling == 3)
+					{
+						distant_handling = 0;
+						const float origin[3] = { 0,0,0 };
+						qdx_light_add(LIGHT_DISTANT, 0, origin, direction, radiance, 0);
+					}
+					continue;
+				}
+				if (0 == strcmp(key, "rtx.fallbackLightMode"))
+				{
+					rmx_fallbacklight_state = value[0] - '0';
+					if (rmx_fallbacklight_state != 0)
+					{
+						//disabled gets set now, but enabled gets set later as a workaround
+						continue;
+					}
+				}
+				if (0 == strcmp(key, "rtx.fallbackLightDelay"))
+				{
+					rmx_fallbacklight_delay = strtol(value, NULL, 10);
+					continue;
+				}
+
 				rmx_console_printf(PRINT_ALL, "Setting option %s = %s\n", key, value);
 				remixapi_ErrorCode rercd = remixInterface.SetConfigVariable( key, value );
 				if ( REMIXAPI_ERROR_CODE_SUCCESS != rercd )
@@ -147,6 +207,41 @@ void rmx_distant_light_radiance(float r, float g, float b, bool enabled)
 	}
 }
 
+void rmx_distant_light_direction(float x, float y, float z, bool enabled)
+{
+	static char direction[64];
+	if (remixOnline)
+	{
+		remixapi_ErrorCode rercd;
+		rercd = remixInterface.SetConfigVariable("rtx.fallbackLightMode", enabled ? "2" : "0");
+		rercd = remixInterface.SetConfigVariable("rtx.fallbackLightType", "0");
+		snprintf(direction, sizeof(direction), "%.3f, %.3f, %.3f", x, y, z);
+		rercd = remixInterface.SetConfigVariable("rtx.fallbackLightDirection", direction);
+		if (REMIXAPI_ERROR_CODE_SUCCESS != rercd)
+		{
+			rmx_console_printf(PRINT_ERROR, "RMX failed to set config var %d\n", rercd);
+		}
+	}
+}
+
+void rmx_frame_end()
+{
+	if (rmx_fallbacklight_state != 0 && rmx_fallbacklight_counter <= rmx_fallbacklight_delay)
+	{
+		if (rmx_fallbacklight_counter++ == rmx_fallbacklight_delay)
+		{
+			const char* key = "rtx.fallbackLightMode";
+			const char* value = "2";
+			rmx_console_printf(PRINT_ALL, "Setting option %s = %s\n", key, value);
+			remixapi_ErrorCode rercd = remixInterface.SetConfigVariable(key, value);
+			if (REMIXAPI_ERROR_CODE_SUCCESS != rercd)
+			{
+				rmx_console_printf(PRINT_ERROR, "RMX failed to set config var %d\n", rercd);
+			}
+		}
+	}
+}
+
 void rmx_set_game_api( game_api fn )
 {
 	g_game_api = fn;
@@ -154,15 +249,22 @@ void rmx_set_game_api( game_api fn )
 
 void rmx_gamevar_set( const char *name, const char *val )
 {
-	if ( g_game_api )
-		g_game_api( OP_SETVAR, name, val, NULL );
+	if (g_game_api)
+	{
+		gameparam_t pname, pval, pnull = { 0 };
+		pname.strval = name;
+		pval.strval = val;
+		g_game_api(OP_SETVAR, pname, pval, pnull);
+	}
 }
 
 int rmx_gamevar_get( const char *name )
 {
 	if ( g_game_api )
 	{
-		gameparam_t ret = g_game_api( OP_GETVAR, name, NULL, NULL );
+		gameparam_t pname, pnull = { 0 };
+		pname.strval = name;
+		gameparamret_t ret = g_game_api( OP_GETVAR, pname, pnull, pnull);
 		return ret.intval;
 	}
 	return 0;
@@ -170,8 +272,11 @@ int rmx_gamevar_get( const char *name )
 
 void rmx_deactivate_mouse()
 {
-	if ( g_game_api )
-		g_game_api( OP_DEACTMOUSE, NULL, NULL, NULL );
+	if (g_game_api)
+	{
+		gameparam_t pnull = { 0 };
+		g_game_api(OP_DEACTMOUSE, pnull, pnull, pnull);
+	}
 }
 
 void rmx_console_printf( int printLevel, const char *fmt, ... )
@@ -184,20 +289,27 @@ void rmx_console_printf( int printLevel, const char *fmt, ... )
 		va_start( args, fmt );
 		vsnprintf( msg, sizeof( msg ), fmt, args );
 		va_end( args );
-		g_game_api( OP_CONPRINT, printLevel, msg, NULL );
+		gameparam_t plevel, pmsg, pnull = { 0 };
+		plevel.intval = printLevel;
+		pmsg.strval = msg;
+		g_game_api( OP_CONPRINT, plevel, pmsg, pnull );
 	}
 }
 
 void rmx_exec_cmd( const char *cmd )
 {
-	if ( g_game_api )
-		g_game_api( OP_EXECMD, cmd, NULL, NULL );
+	if (g_game_api)
+	{
+		gameparam_t pcmd, pnull = { 0 };
+		pcmd.strval = cmd;
+		g_game_api(OP_EXECMD, pcmd, pnull, pnull);
+	}
 }
 
-static int sys_timeBase;
 int rmx_milliseconds( void )
 {
 	static bool initialized = false;
+	static int sys_timeBase;
 
 	if ( !initialized ) {
 		sys_timeBase = timeGetTime();
@@ -206,6 +318,19 @@ int rmx_milliseconds( void )
 	int sys_curtime = timeGetTime() -sys_timeBase;
 
 	return sys_curtime;
+}
+
+float* rmx_4imgui_getnormalsthresh()
+{
+	float* ret = 0;
+
+	if (g_game_api)
+	{
+		gameparam_t pnull = { 0 };
+		ret = g_game_api(OP_GETNORMALSTHRESHVAL, pnull, pnull, pnull).pfltval;
+	}
+
+	return ret;
 }
 
 void qdx_storemapconfflt( const char* base, const char* valname, float value, bool inGlobal )
@@ -263,6 +388,126 @@ float qdx_readmapconfflt( const char* base, const char* valname, float default_v
 	return ret;
 }
 
+void qdx_storemapconfstr(const char* base, const char* valname, const char* value, bool inGlobal)
+{
+	if (inGlobal == false && active_map.length() == 0)
+	{
+		return;
+	}
+
+	std::string section(base);
+	section.append(".");
+	if (inGlobal)
+	{
+		section.append(INICONF_GLOBAL);
+	}
+	else
+	{
+		section.append(active_map.c_str());
+	}
+	g_iniconf[section][valname] = std::string(value);
+}
+
+int qdx_readmapconfstr(const char* base, const char* valname, char* out, int outsz)
+{
+	int tries = 0;
+	std::string section(base);
+	section.append(".");
+	if (active_map.length())
+	{
+		section.append(active_map.c_str());
+	}
+	else
+	{
+		section.append(INICONF_GLOBAL);
+		tries = 1;
+	}
+
+	for (; tries < 2; tries++)
+	{
+		if (g_iniconf.has(section) && g_iniconf[section].has(valname))
+		{
+			errno_t ercd = strncpy_s(out, outsz, g_iniconf[section][valname].c_str(), _TRUNCATE);
+			if (ercd == STRUNCATE)
+			{
+				rmx_console_printf(PRINT_ALL, "readmapconfstr: string truncation for %s, expected max %d bytes.\n", valname, outsz);
+				return 0;
+			}
+			if (ercd == 0)
+			{
+				return 1;
+			}
+		}
+		else
+		{
+			section.assign(base);
+			section.append(".");
+			section.append(INICONF_GLOBAL);
+		}
+	}
+	return 0;
+}
+
+intptr_t qdx_readmapconf_ex(const char* base, const char* valname, int radix)
+{
+	intptr_t ret = 0;
+	int tries = 0;
+	std::string section(base);
+	section.append(".");
+	if (active_map.length())
+	{
+		section.append(active_map.c_str());
+	}
+	else
+	{
+		section.append(INICONF_GLOBAL);
+		tries = 1;
+	}
+
+	for (; tries < 2; tries++)
+	{
+		if (g_iniconf.has(section) && g_iniconf[section].has(valname))
+		{
+			ret = strtoul(g_iniconf[section][valname].c_str(), NULL, radix);
+			break;
+		}
+		else
+		{
+			section.assign(base);
+			section.append(".");
+			section.append(INICONF_GLOBAL);
+		}
+	}
+	return ret;
+}
+
+int qdx_readmapconfint(const char* base, const char* valname)
+{
+	return (int)qdx_readmapconf_ex(base, valname, 10);
+}
+
+void qdx_storemapconfint(const char* base, const char* valname, int value, bool inGlobal)
+{
+	if (inGlobal == false && active_map.length() == 0)
+	{
+		return;
+	}
+	char data[32];
+	snprintf(data, sizeof(data), "%d", value);
+
+	std::string section(base);
+	section.append(".");
+	if (inGlobal)
+	{
+		section.append(INICONF_GLOBAL);
+	}
+	else
+	{
+		section.append(active_map.c_str());
+	}
+	g_iniconf[section][valname] = data;
+}
+
 static std::map<std::string, int> asserted_fns;
 #define ASSERT_MAX_PRINTS 1
 
@@ -296,11 +541,18 @@ void qdx_assert_failed_str(const char* expression, const char* function, unsigne
 	if (will_print)
 	{
 #ifdef NDEBUG
-		if(supressed_msg)
+		if (supressed_msg)
+		{
+			rmx_console_printf(PRINT_ERROR, "Error: assert failed: %s in %s:%d %s\n", expression, function, line, fn);
 			logPrintf("Error: assert failed and supressing: %s in %s:%d %s\n", expression, function, line, fn);
+		}
 		else
+		{
+			rmx_console_printf(PRINT_ERROR, "Error: assert failed: %s in %s:%d %s\n", expression, function, line, fn);
 			logPrintf("Error: assert failed: %s in %s:%d %s\n", expression, function, line, fn);
+		}
 #else
+		rmx_console_printf(PRINT_ERROR, "Error: assert failed: %s in %s:%d %s\n", expression, function, line, fn);
 		logPrintf("Error: assert failed: %s in %s:%d %s\n", expression, function, line, fn);
 #endif
 	}

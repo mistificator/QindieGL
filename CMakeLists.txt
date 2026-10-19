@@ -122,7 +122,7 @@ target_include_directories(QindieGL PRIVATE
     extern
     idtech3_mixup
     extern/mINI	
-	msvc
+    msvc
 )
 
 # libs
@@ -137,6 +137,7 @@ target_compile_definitions(QindieGL PRIVATE
     _WINDOWS
     _USRDLL
     QINDIEGLSRC_EXPORTS
+    SHADERS_FROM_SOURCE
 )
 
 target_compile_definitions(QindieGL PRIVATE

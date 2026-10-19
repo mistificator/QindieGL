@@ -57,9 +57,9 @@ extern OPENGL_API void WINAPI glMultiTexCoord4sv( GLenum target, const GLshort *
 extern OPENGL_API void WINAPI glMultiTexCoord4iv( GLenum target, const GLint *v );
 extern OPENGL_API void WINAPI glMultiTexCoord4fv( GLenum target, const GLfloat *v );
 extern OPENGL_API void WINAPI glMultiTexCoord4dv( GLenum target, const GLdouble *v );
-extern OPENGL_API void WINAPI WINAPI glActiveStencilFace(GLenum face);
-extern OPENGL_API void WINAPI WINAPI glDeleteTextures(GLsizei n, const GLuint *textures);
-extern OPENGL_API void WINAPI WINAPI glGenTextures(GLsizei n, GLuint *textures);
+extern OPENGL_API void WINAPI glActiveStencilFace(GLenum face);
+extern OPENGL_API void WINAPI glDeleteTextures(GLsizei n, const GLuint *textures);
+extern OPENGL_API void WINAPI glGenTextures(GLsizei n, GLuint *textures);
 extern OPENGL_API GLboolean WINAPI glIsTexture(GLuint texture);
 extern OPENGL_API void WINAPI glBindTexture(GLenum target, GLuint texture);
 extern OPENGL_API GLboolean WINAPI glAreTexturesResident(GLsizei n,  const GLuint *textures,  GLboolean *residences);
@@ -68,8 +68,6 @@ extern OPENGL_API void WINAPI glTexImage3D(GLenum target, GLint level, GLint int
 extern OPENGL_API void WINAPI glTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels);
 extern OPENGL_API void WINAPI glCopyTexImage3D(GLenum target,  GLint level,  GLenum internalFormat,  GLint x,  GLint y,  GLint z,  GLsizei width,  GLsizei height,  GLsizei depth,  GLint border);
 extern OPENGL_API void WINAPI glCopyTexSubImage3D(GLenum target,  GLint level,  GLint xoffset,  GLint yoffset,  GLint zoffset,  GLint x,  GLint y,  GLint z,  GLsizei width,  GLsizei height,  GLsizei depth);
-extern OPENGL_API BOOL WINAPI wglSwapInterval(int interval);
-extern OPENGL_API int WINAPI wglGetSwapInterval();
 extern OPENGL_API void WINAPI glSelectTexture(GLenum texture);
 extern OPENGL_API void WINAPI glMTexCoord2f( GLenum target, GLfloat s, GLfloat t );
 extern OPENGL_API void WINAPI glMTexCoord2fv( GLenum target, const GLfloat *v );
@@ -115,5 +113,10 @@ extern OPENGL_API void WINAPI glCompressedTexSubImage3D(GLenum target, GLint lev
 extern OPENGL_API void WINAPI glGetCompressedTexImage(GLenum target, GLint level, GLvoid *img);
 extern OPENGL_API void WINAPI glPNTrianglesiATI( GLenum pname, GLint param );
 extern OPENGL_API void WINAPI glPNTrianglesfATI( GLenum pname, GLfloat param );
+
+extern OPENGL_API const char* WINAPI wglGetExtensionsStringARB( HDC );
+extern OPENGL_API BOOL WINAPI wglSwapInterval(int interval);
+extern OPENGL_API int WINAPI wglGetSwapInterval();
+extern OPENGL_API HGLRC WINAPI wglCreateContextAttribsARB( HDC hDC, HGLRC hShareContext, const int *attribList );
 
 #endif //QINDIEGL_D3D_EXTENSION_H

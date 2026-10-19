@@ -28,7 +28,7 @@
             {
                 "label": "CMake: Build x86",
                 "type": "shell",
-                "command": "cmake --build ${workspaceFolder}/build-x86 --config Release",
+                "command": "cmake --build ${workspaceFolder}/build-x86 --config Debug",
                 "group": {
                     "kind": "build",
                     "isDefault": false

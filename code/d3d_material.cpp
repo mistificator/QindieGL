@@ -31,6 +31,9 @@
 
 OPENGL_API void WINAPI glColorMaterial( GLenum face, GLenum mode )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -48,6 +51,9 @@ OPENGL_API void WINAPI glColorMaterial( GLenum face, GLenum mode )
 
 OPENGL_API void WINAPI glMaterialf( GLenum face, GLenum pname, GLfloat param )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -75,6 +81,9 @@ OPENGL_API void WINAPI glMateriali( GLenum face, GLenum pname, GLint param )
 
 OPENGL_API void WINAPI glMaterialfv( GLenum face, GLenum pname, const GLfloat *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -146,6 +155,9 @@ OPENGL_API void WINAPI glMaterialiv( GLenum face, GLenum pname, const GLint *par
 
 OPENGL_API void WINAPI glGetMaterialfv( GLenum face, GLenum pname, GLfloat *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -192,6 +204,9 @@ OPENGL_API void WINAPI glGetMaterialfv( GLenum face, GLenum pname, GLfloat *para
 
 OPENGL_API void WINAPI glGetMaterialiv( GLenum face, GLenum pname, GLint *params )
 {
+	D3DGlobal_t & D3DGlobal = * D3DGlobalPtr;
+	D3DState_t & D3DState = D3DStateForContext( D3DGlobal.hGLRC );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
