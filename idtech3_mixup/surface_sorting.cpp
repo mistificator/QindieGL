@@ -6,11 +6,16 @@
 #include "detours.h"
 #include <search.h>
 #include <string>
+#include <math.h>
 
 #include "d3d_wrapper.hpp"
 #include "d3d_global.hpp"
 #include "d3d_helpers.hpp"
 #include "d3d_utils.hpp"
+
+#include "rmx_gen.h"
+
+#define EXEC_APPEND 2
 
 static int g_dump_data = false;
 
@@ -92,6 +97,9 @@ static int qsort_compare( const void *arg1, const void *arg2 )
 typedef float vec_t;
 typedef vec_t vec3_t[3];
 typedef enum {qfalse, qtrue}    qboolean;
+typedef uint8_t byte;
+typedef uint32_t uint;
+typedef uint16_t ushort;
 
 typedef struct cvar_s {
 	char        *name;
@@ -107,6 +115,11 @@ typedef struct cvar_s {
 	struct cvar_s *hashNext;
 } cvar_t;
 
+typedef cvar_t* (*cvarGet)(const char* name, const char* value, int flags);
+typedef void (*cvarSet)(const char*, const char*);
+typedef void (*riPrintf)(int printLevel, const char* format, ...);
+typedef void (*execCmd)(int exec_when, const char* text);
+
 typedef struct jmp_helper_s
 {
 	byte* addr;
@@ -119,7 +132,12 @@ static const void* fp_qsortFast = 0;
 static const void* fp_qsortFast_uc0 = 0;
 static const void* fp_markLeaves = 0;
 static const void* fp_cvarGet = 0;
+static const void* fp_execCmd = 0;
 static const void* fp_cvarSet = 0;
+static const void* fp_printf = 0;
+static const void* fp_deactMouse = 0;
+static const void* fp_mouseMove = 0;
+static const int* dp_mouseActive = 0;
 static const cvar_t* cvar_novis = 0;
 static const int* tr_dp_skyportal = 0;
 static byte* jmp_skyOnscreen = 0;
@@ -136,6 +154,10 @@ static const void* fp_addworldsurfaces = 0;
 static const void* fp_dumpdxf = 0;
 static jmp_helper_t jmp_helpers[20];
 static byte jmp_helper_eb = 0xeb;
+static byte* dp_callrenderview = 0;
+static void (*fp_renderview)(void*) = 0;
+static void (*fp_skyrender)() = 0;
+static const void* fp_surfacemodelcached = 0;
 
 static void hook_qsortFast(void* base, unsigned int num, unsigned width)
 {
@@ -182,6 +204,7 @@ static void hook_qsortFast(void* base, unsigned int num, unsigned width)
 	}
 }
 
+#if id386
 static __declspec(naked) void hook_qsortFast_uc0()
 {
 	//EAX = 00000456 EBX = 00000008 ECX = 1F23C900
@@ -204,6 +227,12 @@ static __declspec(naked) void hook_qsortFast_uc0()
 		ret
 	}
 }
+#else
+static void hook_qsortFast_uc0()
+{
+	PRINT_ONCE("ERROR: %s is beig called.. Why?\n", __func__);
+}
+#endif
 
 static void hook_markLeaves( void )
 {
@@ -211,13 +240,13 @@ static void hook_markLeaves( void )
 
 	if ( !cvar_novis )
 	{
-		cvar_novis = ((cvar_t*(*)( const char *name, const char *value, int flags ))fp_cvarGet)("r_novis", "0", 0x200);
+		cvar_novis = (cvarGet(fp_cvarGet))("r_novis", "0", 0x200);
 	}
 
 	int novis = cvar_novis->integer;
 	if ( novis == 1 && *tr_dp_skyportal == 1 )
 	{
-		((void(*)( const char *, const char * ))fp_cvarSet)( "r_novis", "0" );
+		(cvarSet(fp_cvarSet))( "r_novis", "0" );
 	}
 	else
 	{
@@ -229,10 +258,11 @@ static void hook_markLeaves( void )
 
 	if ( novis )
 	{
-		((void(*)( const char *, const char * ))fp_cvarSet)( "r_novis", "1" );
+		(cvarSet(fp_cvarSet))( "r_novis", "1" );
 	}
 }
 
+#if id386
 static void hook_addworldsurf( void* pdata, int val )
 {
 	HOOK_ONLINE_NOTICE();
@@ -249,6 +279,12 @@ static void hook_addworldsurf( void* pdata, int val )
 		//((void (*)(void*))fp_addworldsurf2)(ptr);
 	}
 }
+#else
+static void hook_addworldsurf(void* pdata, int val)
+{
+	PRINT_ONCE("ERROR: %s is beig called.. Why?\n", __func__);
+}
+#endif
 
 static void hook_addworldsurfaces()
 {
@@ -260,8 +296,19 @@ static void hook_addworldsurfaces()
 
 typedef float vec3_t[3];
 
+#define VectorCopy(a,b)			(b[0]=a[0],b[1]=a[1],b[2]=a[2])
 #define DotProduct( x,y )         ( ( x )[0] * ( y )[0] + ( x )[1] * ( y )[1] + ( x )[2] * ( y )[2] )
 #define PLANE_NON_AXIAL 3
+
+vec3_t frustumnormals[4] = { 0 };
+float frustumdist[4] = { 0 };
+int frustumtype = 0;
+int frustumoverride = 0;
+
+float* qdx_4imgui_frustrumplane(int idx) { return frustumnormals[idx]; }
+float* qdx_4imgui_frustumdist(int idx) { return &frustumdist[idx]; }
+int* qdx_4imgui_frustumtype() { return &frustumtype; }
+int* qdx_4imgui_frustumoverride() { return &frustumoverride; }
 
 typedef struct cplane_s {
 	vec3_t normal;
@@ -337,22 +384,100 @@ static void hook_setupfrustum()
 		//restore axis and render forward looking
 		memcpy( axis0, backup_axis, sizeof( backup_axis ) );
 	}
-
+	 
 	((void(*)())fp_setupfrustum)();
+
+
+	//for (int i = 0; i < 4; i++)
+	//{
+
+	//	if (frustumoverride)
+	//	{
+	//		VectorCopy(frustumnormals[i], frustum[i].normal);
+	//	}
+	//	else
+	//	{
+	//		VectorCopy(frustum[i].normal, frustumnormals[i]);
+	//	}
+	//}
+
 	//now let the normal rendering flow execute
 
 	tr_dp_viewfov[0] = orgfovx;
 	tr_dp_viewfov[1] = orgfovy;
-	
+
+	//const vec3_t nl = { 0, 1, 0 };
+	//const vec3_t nr = { 0, -1, 0 };
+	//const vec3_t nt = { 0, 0, -1 };
+	//const vec3_t nb = { 0, 0, 1 };
+	//VectorCopy(nl, frustum[0].normal);
+	//VectorCopy(nr, frustum[1].normal);
+	//VectorCopy(nt, frustum[2].normal);
+	//VectorCopy(nb, frustum[3].normal);
+	//
 	//for ( int i = 0; i < 4; i++ )
 	//{
-	//	frustum[i].normal[0] = axis0[0];
-	//	frustum[i].normal[1] = axis0[1];
-	//	frustum[i].normal[2] = axis0[2];
+	////	//frustum[i].normal[0] = axis0[0];
+	////	//frustum[i].normal[1] = axis0[1];
+	////	//frustum[i].normal[2] = axis0[2];
 	//	frustum[i].type = PLANE_NON_AXIAL;
 	//	frustum[i].dist = DotProduct(origin, frustum[i].normal);
+	//	if (frustumoverride)
+	//	{
+	//		frustum[i].dist = frustumdist[i];
+	//	}
+	//	else
+	//	{
+	//		frustumdist[i] = frustum[i].dist;
+	//	}
 	//	SetPlaneSignbits(&frustum[i]);
 	//}
+}
+
+#if id386
+static void hook_surfacemodelcached(byte *param_1)
+{
+	//ecx, edx can be clobbered
+	const void* fp_RB_EndSurface = (void*)0x004f7340;
+	const void* fp_RB_BeginSurface = (void*)0x004f40f0;
+	const int* dp_017efc1c = (int*)0x017efc1c;
+	//const int* dp_017efc00 = (int*)0x017efc00;
+	int* dp_01548adc = (int*)0x01548adc;
+	//const int* dp_017efc10 = (int*)0x017efc10;
+	const int* dp_modelcachecount = (int*)0x0182fc34;
+	int surfcount = (uint)*(ushort*)(*(int*)(param_1 + 4) + 0x10);
+	if (0x20000 < surfcount + *dp_modelcachecount) {
+		((void(*)())fp_RB_EndSurface)();
+		*dp_01548adc = *dp_017efc1c;
+		_asm {
+			MOV        EDX, dword ptr ds:0x017efc00
+			MOV        ECX, dword ptr ds:0x017efc10
+			PUSH       EDX
+			call fp_RB_BeginSurface
+			add esp, 4
+		}
+	}
+	((void(*)(void*))fp_surfacemodelcached)(param_1);
+}
+#else
+static void hook_surfacemodelcached(byte* param_1)
+{
+	PRINT_ONCE("ERROR: %s is beig called.. Why?\n", __func__);
+}
+#endif
+
+static void intercept_R_RenderView( /*viewParms_t*/int* parms)
+{
+	fp_skyrender();
+	fp_renderview(parms);
+}
+
+static void hook_IN_MouseMove()
+{
+	if (*dp_mouseActive)
+	{
+		((void(*)())fp_mouseMove)();
+	}
 }
 
 static void hook_retvoid()
@@ -383,6 +508,45 @@ static int hook_retnegone()
 	return -1;
 }
 
+static gameparamret_t __cdecl surface_sorting_implement_api(gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2)
+{
+	gameparamret_t ret = { 0 };
+
+	switch (op)
+	{
+	case OP_GETVAR: {
+		ret.intval = -1;
+		if (fp_cvarGet)
+		{
+			cvar_t* v = (cvarGet(fp_cvarGet))(p0.strval, "0", 0);
+			if (v) ret.intval = v->integer;
+		}
+		break; }
+	case OP_SETVAR:
+		if (fp_cvarSet) (cvarSet(fp_cvarSet))(p0.strval, p1.strval);
+		break;
+	case OP_EXECMD:
+		if(fp_execCmd) (execCmd(fp_execCmd))(EXEC_APPEND, p0.strval);
+		break;
+	case OP_CONPRINT: {
+		if(fp_printf) (riPrintf(fp_printf)(PRINT_ALL, "%s", p1.strval));
+		break; }
+	case OP_DEACTMOUSE:
+		if (fp_deactMouse) ((void (*)())fp_deactMouse)();
+		break;
+	case OP_GETNORMALSTHRESHVAL:
+		break;
+	default:
+		if (fp_printf)
+			(riPrintf(fp_printf)(PRINT_ALL, "Unsupported OP:%d\n", op));
+		else
+			logPrintf("Unsupported OP:%d\n", op);
+		break;
+	}
+
+	return ret;
+}
+
 static int config_int( const char* name, bool required, bool* not_found = 0 )
 {
 	int ret = 0;
@@ -405,7 +569,7 @@ static int config_int( const char* name, bool required, bool* not_found = 0 )
 	return 0;
 }
 
-static void* config_hex(const char* name, bool required, bool *not_found = 0)
+static void* config_codeptr(const char* name, bool required, bool *not_found = 0)
 {
 	void* ret = 0;
 
@@ -413,6 +577,28 @@ static void* config_hex(const char* name, bool required, bool *not_found = 0)
 	if (ret)
 	{
 		ret = hook_offset_to_addr( ret );
+		logPrintf("SurfaceSort: config %s found %p\n", name, ret);
+		return ret;
+	}
+
+	if (not_found)
+	{
+		*not_found = true;
+	}
+	if (required)
+	{
+		logPrintf("SurfaceSort: config %s not found\n", name);
+	}
+	return 0;
+}
+
+static void* config_hex(const char* name, bool required, bool* not_found = 0)
+{
+	void* ret = 0;
+
+	ret = D3DGlobal_ReadGameConfPtr(name);
+	if (ret)
+	{
 		logPrintf("SurfaceSort: config %s found %p\n", name, ret);
 		return ret;
 	}
@@ -512,7 +698,7 @@ static bool read_conf()
 		const char* searchstr = "qsortFast";
 
 		//see if there is a function hex address
-		fp_qsortFast = config_hex( searchstr, false );
+		fp_qsortFast = config_codeptr( searchstr, false );
 
 		//search for hex patterns
 		strncpy_s( name, sizeof( name ), searchstr, _TRUNCATE );
@@ -527,7 +713,7 @@ static bool read_conf()
 		const char* searchstr = "qsortFast_uc0";
 
 		//see if there is a function hex address
-		fp_qsortFast_uc0 = config_hex( searchstr, false );
+		fp_qsortFast_uc0 = config_codeptr( searchstr, false );
 
 		//search for hex patterns
 		strncpy_s( name, sizeof( name ), searchstr, _TRUNCATE );
@@ -538,21 +724,35 @@ static bool read_conf()
 		}
 	}
 
-	fp_markLeaves = config_hex( "markLeaves", false );
+	fp_cvarSet = (const void**)config_codeptr("fp_cvarSet", false);
+	fp_cvarGet = (const void**)config_codeptr("fp_cvarGet", false);
+	fp_printf = (const void**)config_codeptr("fp_printf", false);
+	fp_execCmd = (const void**)config_codeptr("fp_execCmd", false);
+	fp_deactMouse = (const void**)config_codeptr("fp_deactMouse", false);
+	dp_mouseActive = (const int*)config_codeptr("dp_mouseActive", false);
+	if(dp_mouseActive)
+	{
+		fp_mouseMove = (const void**)config_codeptr("fp_mouseMove", true, &not_found);
+	}
+
+	fp_markLeaves = config_codeptr( "markLeaves", false );
 	if ( fp_markLeaves )
 	{
-		fp_cvarSet = (const void**)config_hex( "fp_cvarSet", true, &not_found );
-		fp_cvarGet = (const void**)config_hex( "fp_cvarGet", true, &not_found );
-		tr_dp_skyportal = (const int*)config_hex( "tr_dp_skyportal", true, &not_found );
+		if (!fp_cvarSet || !fp_cvarGet)
+		{
+			not_found = true;
+			logPrintf("SurfaceSort: config cvar not found %p/%p\n", fp_cvarSet, fp_cvarGet);
+		}
+		tr_dp_skyportal = (const int*)config_codeptr( "tr_dp_skyportal", true, &not_found );
 	}
-	jmp_skyOnscreen = (byte*)config_hex( "jmp_skyOnscreen", false );
+	jmp_skyOnscreen = (byte*)config_codeptr( "jmp_skyOnscreen", false );
 
 	//search for jmp
 	memset( jmp_helpers, 0, sizeof( jmp_helpers ) );
 	for ( i = 0, j = 0; i < ARRAYSIZE( jmp_helpers ); i++ )
 	{
 		snprintf( name, sizeof( name ), "jmp_target%d", i );
-		byte* addr = (byte*)config_hex( name, false );
+		byte* addr = (byte*)config_codeptr( name, false );
 		if ( !addr ) addr = (byte*)config_pattern( name, false );
 		if ( addr != 0 )
 		{
@@ -598,10 +798,19 @@ static bool read_conf()
 		tr_dp_viewfov = (float*)hook_loadptr(config_pattern( "tr_dp_viewfov", true, &not_found ));
 	}
 
-	fp_retvoid = config_hex( "fp_retvoid", false );
-	fp_retzero = config_hex( "fp_retzero", false );
-	fp_retone = config_hex( "fp_retone", false );
-	fp_retnegone = config_hex( "fp_retnegone", false );
+	fp_renderview = (void(*)(void*))config_codeptr( "fp_renderview", false );
+	if ( fp_renderview )
+	{
+		dp_callrenderview = (byte*)config_codeptr("dp_callrenderview", true );
+		fp_skyrender = (void(*)())config_codeptr( "fp_skyrender", true );
+	}
+
+	//fp_surfacemodelcached = (void*)0x004fa210;
+
+	fp_retvoid = config_codeptr( "fp_retvoid", false );
+	fp_retzero = config_codeptr( "fp_retzero", false );
+	fp_retone = config_codeptr( "fp_retone", false );
+	fp_retnegone = config_codeptr( "fp_retnegone", false );
 
 	return (false == not_found);
 }
@@ -651,6 +860,16 @@ static void do_detour_action( DetourAction_FP detourAction )
 			error = detourAction(&(PVOID&)fp_setupfrustum, hook_setupfrustum);
 			BREAK_ON_DETOUR_ERROR(error, errhint);
 		}
+		if (fp_surfacemodelcached)
+		{
+			error = detourAction(&(PVOID&)fp_surfacemodelcached, hook_surfacemodelcached);
+			BREAK_ON_DETOUR_ERROR(error, errhint);
+		}
+		if (fp_mouseMove)
+		{
+			error = detourAction(&(PVOID&)fp_mouseMove, hook_IN_MouseMove);
+			BREAK_ON_DETOUR_ERROR(error, errhint);
+		}
 		if ( fp_retvoid )
 		{
 			error = detourAction(&(PVOID&)fp_retvoid, hook_retvoid);
@@ -691,6 +910,18 @@ void hook_surface_sorting_do_init()
 
 		unsigned long restore;
 
+		if ( fp_renderview && hook_unprotect( dp_callrenderview, 5, &restore ) )
+		{
+			intptr_t val;
+			memcpy( &val, &dp_callrenderview[1], sizeof( val ) );
+			if ( dp_callrenderview[0] == 0xe8 && val == 0xfffe9153 )
+			{
+				val = (intptr_t)intercept_R_RenderView - (intptr_t)&dp_callrenderview[5];
+				memcpy( &dp_callrenderview[1], &val, sizeof( val ) );
+			}
+			hook_protect( dp_callrenderview, 5, restore );
+		}
+
 		if ( jmp_skyOnscreen && hook_unprotect(jmp_skyOnscreen, 1, &restore) )
 		{
 			jmp_skyOnscreen[0] = 0xeb;
@@ -716,6 +947,9 @@ void hook_surface_sorting_do_init()
 				}
 			}
 		}
+
+		if(fp_cvarGet || fp_cvarSet)
+			rmx_set_game_api(surface_sorting_implement_api);
 	}
 	else
 	{

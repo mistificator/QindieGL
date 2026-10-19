@@ -105,7 +105,9 @@ OPENGL_API void WINAPI glDepthMask( GLboolean flag )
 {
 	if (D3DState.DepthBufferState.depthWriteMask != flag) {
 		D3DState.DepthBufferState.depthWriteMask = flag;
-		D3DState_SetRenderState( D3DRS_ZWRITEENABLE, flag );
+		if( !D3DGlobal.settings.game.depthOffDisablesWrites ||
+				( D3DGlobal.settings.game.depthOffDisablesWrites && D3DState.EnableState.depthTestEnabled ) )
+						D3DState_SetRenderState( D3DRS_ZWRITEENABLE, flag );
 	}
 }
 OPENGL_API void WINAPI glDepthRange( GLclampd zNear, GLclampd zFar )
@@ -231,12 +233,6 @@ OPENGL_API void WINAPI glViewport( GLint x, GLint y, GLsizei width, GLsizei heig
 	}
 	HRESULT hr = D3DGlobal.pDevice->SetViewport(&D3DState.viewport);
 	if (FAILED(hr)) D3DGlobal.lastError = hr;
-
-	if ( D3DGlobal.settings.game.orthovertexshader )
-	{
-		float texelOffset[4] =  {-1.0f/D3DState.viewport.Width, 1.0f/D3DState.viewport.Height, 0.0f, 0.0f};
-		D3DGlobal.pDevice->SetVertexShaderConstantF(0, texelOffset, 1);
-	}
 
 	if (x < 0 || y < 0)
 	{

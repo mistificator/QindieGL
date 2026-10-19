@@ -30,10 +30,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="opengl32.def">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="..\README.md">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="opengl32.def">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
@@ -237,6 +237,9 @@
     <ClInclude Include="..\code\resource.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\code\qindie_rmx.h">
+      <Filter>Header Files\Remix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="QindieGL.ini">
@@ -244,12 +247,10 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\code\shaders\ortho_ps.hlsl">
-      <Filter>Source Files\shaders</Filter>
-    </Text>
-  </ItemGroup>
-  <ItemGroup>
     <FxCompile Include="..\code\shaders\ortho_vs.hlsl">
+      <Filter>Source Files\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\code\shaders\ortho_ps.hlsl">
       <Filter>Source Files\shaders</Filter>
     </FxCompile>
   </ItemGroup>

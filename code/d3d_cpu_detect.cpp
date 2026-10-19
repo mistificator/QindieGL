@@ -32,6 +32,7 @@
 // Used to detect SSE support
 //==================================================================================
 
+#if id386
 static bool cpuid( unsigned long function, unsigned long& out_eax, unsigned long& out_ebx, unsigned long& out_ecx, unsigned long& out_edx )
 {
 	int info[4];
@@ -42,6 +43,7 @@ static bool cpuid( unsigned long function, unsigned long& out_eax, unsigned long
 	out_edx = *reinterpret_cast<unsigned long *>(&info[3]);
 	return true;
 }
+#endif
 
 void D3DGlobal_CPU_Detect()
 {
@@ -49,16 +51,23 @@ void D3DGlobal_CPU_Detect()
 	char szVendorID[13];
 	memset( szVendorID, 0, sizeof(szVendorID) );
 
+#if id386
 	if( !cpuid(0, p1, p2, p3, p4 ) ) {
-		strcpy_s( szVendorID, "Generic_x86" ); 
+		strcpy_s( szVendorID, "Generic_x86" );
 	} else {
 		memcpy( szVendorID+0, &(p2), sizeof( p2 ) );
 		memcpy( szVendorID+4, &(p4), sizeof( p4 ) );
 		memcpy( szVendorID+8, &(p3), sizeof( p3 ) );
 	}
+#elif idx64
+	strcpy_s(szVendorID, "Generic_x64");
+#else
+	strcpy_s(szVendorID, "Unsupported");
+#endif
 
 	logPrintf("CPU: %s\n", szVendorID );
 
+#if id386
     if( !cpuid( 1, p1, p2, p3, p4 ) ) {
 		logPrintf("Features: none\n" );
 		D3DGlobal.settings.useSSE = false;
@@ -90,4 +99,12 @@ void D3DGlobal_CPU_Detect()
 	if (D3DGlobal.settings.useSSE) {
 		logPrintf("Using SSE optimizations\n" );
 	}
+#elif idx64
+	if (D3DGlobal.settings.useSSE) {
+		logPrintf("Using SSE optimizations\n");
+	}
+#else
+	logPrintf("WARNING: SSE is not supported, all SSE optimizations disabled\n");
+	D3DGlobal.settings.useSSE = false;
+#endif
 }
