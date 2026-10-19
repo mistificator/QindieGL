@@ -49,6 +49,7 @@ struct color_override_data_s
  */
 static light_override_t* qdx_light_find_override( uint64_t hash );
 static vec_t Distance( const vec3_t p1, const vec3_t p2 );
+void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 
 /**
  * Globals
@@ -60,6 +61,9 @@ static iterdl_t g_lights_dynamic_bitmap = 0;
 static std::map<uint64_t, light_data_t> g_lights_flares;
 static remixapi_LightHandle g_flashlight_handle[NUM_FLASHLIGHT_HND] = { 0 };
 #define FLASHLIGHT_HASH 0xF1A581168700ULL
+
+#define DISTANTLIGHT_HASH 0xD157A47000ULL
+static remixapi_LightHandle g_distantlight_handle = 0;
 
 //no idea what to choose here
 #define DEFAULT_LIGHT_RADIANCE_DYNAMIC_BASE 75.0f
@@ -73,6 +77,8 @@ static float LIGHT_RADIANCE_DYNAMIC_SCALE = DEFAULT_LIGHT_RADIANCE_DYNAMIC_SCALE
 static float LIGHT_RADIANCE_CORONAS = DEFAULT_LIGHT_RADIANCE_CORONAS;
 static float LIGHT_RADIUS[2] = { DEFAULT_LIGHT_RADIUS, DEFAULT_CORONA_RADIUS };
 static float LIGHT_RADIUS_DYNAMIC_SCALE = DEFAULT_LIGHT_RADIUS_DYNAMIC_SCALE;
+static float LIGHT_CYLINDER_AXIS[2][3] = { { 0, 0, 0 }, { 0, 0, 0 } };
+static float LIGHT_CYLINDER_LEN[2] = { 15, 15 };
 static float LIGHT_RADIANCE_FLASHLIGHT[NUM_FLASHLIGHT_HND] = { 400.0f, 960.0f, 4000.0f };
 static float FLASHLIGHT_COLORS[NUM_FLASHLIGHT_HND][3] = {
 	{ 0.9f, 0.98f, 1.0f },
@@ -84,7 +90,7 @@ static float FLASHLIGHT_CONE_SOFTNESS[NUM_FLASHLIGHT_HND] = { 0.05f, 0.02f, 0.02
 static float FLASHLIGHT_VOLUMETRIC[NUM_FLASHLIGHT_HND] = { 1.0f, 1.0f, 1.0f };
 static float FLASHLIGHT_POSITION_CACHE[3] = { 0 };
 static float FLASHLIGHT_DIRECTION_CACHE[3] = { 0 };
-static float FLASHLIGHT_POSITION_OFFSET[3] = { -15, 18, 13 };
+static float FLASHLIGHT_POSITION_OFFSET[3] = { -9, 21, 16 };
 static float FLASHLIGHT_DIRECTION_OFFSET[3] = { 0.095f, -0.08f, 0 };
 static uint64_t LIGHT_PICKING_IDS[3] = { 0 };
 static uint32_t LIGHT_PICKING_COUNT = 0;
@@ -98,6 +104,10 @@ float* qdx_4imgui_radiance_coronas_1f() { return &LIGHT_RADIANCE_CORONAS; }
 float* qdx_4imgui_radius_dynamic_1f() { return &LIGHT_RADIUS[0]; }
 float* qdx_4imgui_radius_dynamic_scale_1f() { return &LIGHT_RADIUS_DYNAMIC_SCALE; }
 float* qdx_4imgui_radius_coronas_1f() { return &LIGHT_RADIUS[1]; }
+float* qdx_4imgui_cylinder_axis_dynamic_3f() { return &LIGHT_CYLINDER_AXIS[0][0]; }
+float* qdx_4imgui_cylinder_axis_coronas_3f() { return &LIGHT_CYLINDER_AXIS[1][0]; }
+float* qdx_4imgui_cylinder_len_dynamic_1f() { return &LIGHT_CYLINDER_LEN[0]; }
+float* qdx_4imgui_cylinder_len_coronas_1f() { return &LIGHT_CYLINDER_LEN[1]; }
 float* qdx_4imgui_flashlight_radiance_1f(int idx) { return &LIGHT_RADIANCE_FLASHLIGHT[idx]; }
 float* qdx_4imgui_flashlight_colors_3f(int idx) { return &FLASHLIGHT_COLORS[idx][0]; }
 float* qdx_4imgui_flashlight_coneangles_1f(int idx) { return &FLASHLIGHT_CONE_ANGLES[idx]; }
@@ -265,7 +275,7 @@ static bool str_starts_with(const std::string& str, const std::string& prefix)
 	return str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0;
 }
 
-static bool str_starts_with(const std::string& str, const char* prefix, unsigned prefixLen)
+static bool str_starts_with(const std::string& str, const char* prefix, size_t prefixLen)
 {
 	return str.size() >= prefixLen && str.compare(0, prefixLen, prefix, prefixLen) == 0;
 }
@@ -280,7 +290,7 @@ static bool str_ends_with(const std::string& str, const std::string& suffix)
 	return str.size() >= suffix.size() && str.compare(str.size()-suffix.size(), suffix.size(), suffix) == 0;
 }
 
-static bool str_ends_with(const std::string& str, const char* suffix, unsigned suffixLen)
+static bool str_ends_with(const std::string& str, const char* suffix, size_t suffixLen)
 {
 	return str.size() >= suffixLen && str.compare(str.size()-suffixLen, suffixLen, suffix, suffixLen) == 0;
 }
@@ -298,33 +308,33 @@ static bool str_ends_with(const std::string& str, const char* suffix)
 
 void qdx_flashlight_save()
 {
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_0", FLASHLIGHT_POSITION_OFFSET[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_1", FLASHLIGHT_POSITION_OFFSET[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_2", FLASHLIGHT_POSITION_OFFSET[2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_0", FLASHLIGHT_DIRECTION_OFFSET[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_1", FLASHLIGHT_DIRECTION_OFFSET[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_2", FLASHLIGHT_DIRECTION_OFFSET[2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_1", LIGHT_RADIANCE_FLASHLIGHT[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_2", LIGHT_RADIANCE_FLASHLIGHT[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_3", LIGHT_RADIANCE_FLASHLIGHT[2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_1", FLASHLIGHT_COLORS[0][0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_1", FLASHLIGHT_COLORS[0][1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_1", FLASHLIGHT_COLORS[0][2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_2", FLASHLIGHT_COLORS[1][0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_2", FLASHLIGHT_COLORS[1][1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_2", FLASHLIGHT_COLORS[1][2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_3", FLASHLIGHT_COLORS[2][0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_3", FLASHLIGHT_COLORS[2][1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_3", FLASHLIGHT_COLORS[2][2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_1", FLASHLIGHT_CONE_ANGLES[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_2", FLASHLIGHT_CONE_ANGLES[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_3", FLASHLIGHT_CONE_ANGLES[2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_1", FLASHLIGHT_CONE_SOFTNESS[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_2", FLASHLIGHT_CONE_SOFTNESS[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_3", FLASHLIGHT_CONE_SOFTNESS[2] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_1", FLASHLIGHT_VOLUMETRIC[0] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_2", FLASHLIGHT_VOLUMETRIC[1] );
-	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_3", FLASHLIGHT_VOLUMETRIC[2] );
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_0", FLASHLIGHT_POSITION_OFFSET[0], true );
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_1", FLASHLIGHT_POSITION_OFFSET[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "PositionOff_2", FLASHLIGHT_POSITION_OFFSET[2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_0", FLASHLIGHT_DIRECTION_OFFSET[0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_1", FLASHLIGHT_DIRECTION_OFFSET[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "DirectionOff_2", FLASHLIGHT_DIRECTION_OFFSET[2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_1", LIGHT_RADIANCE_FLASHLIGHT[0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_2", LIGHT_RADIANCE_FLASHLIGHT[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Radiance_Spot_3", LIGHT_RADIANCE_FLASHLIGHT[2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_1", FLASHLIGHT_COLORS[0][0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_1", FLASHLIGHT_COLORS[0][1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_1", FLASHLIGHT_COLORS[0][2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_2", FLASHLIGHT_COLORS[1][0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_2", FLASHLIGHT_COLORS[1][1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_2", FLASHLIGHT_COLORS[1][2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_R_Spot_3", FLASHLIGHT_COLORS[2][0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_G_Spot_3", FLASHLIGHT_COLORS[2][1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Color_B_Spot_3", FLASHLIGHT_COLORS[2][2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_1", FLASHLIGHT_CONE_ANGLES[0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_2", FLASHLIGHT_CONE_ANGLES[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Angles_Spot_3", FLASHLIGHT_CONE_ANGLES[2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_1", FLASHLIGHT_CONE_SOFTNESS[0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_2", FLASHLIGHT_CONE_SOFTNESS[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Softness_Spot_3", FLASHLIGHT_CONE_SOFTNESS[2], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_1", FLASHLIGHT_VOLUMETRIC[0], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_2", FLASHLIGHT_VOLUMETRIC[1], true);
+	qdx_storemapconfflt( SECTION_FLASHLIGHT, "Volumetric_Spot_3", FLASHLIGHT_VOLUMETRIC[2], true);
 
 	qdx_save_iniconf();
 }
@@ -478,6 +488,12 @@ void qdx_lights_load( void *pini, const char *mapname )
 	}
 }
 
+static int color_eq(float a, float b)
+{
+	float diff = fabs(a - b);
+	return diff < 9e-4f;
+}
+
 static void qdx_light_color_to_radiance(remixapi_Float3D* rad, int light_type, const vec3_t color, float intensity)
 {
 	float radiance = 1.0f;
@@ -495,7 +511,7 @@ static void qdx_light_color_to_radiance(remixapi_Float3D* rad, int light_type, c
 
 		for ( auto it = g_color_overrides.begin(); it != g_color_overrides.end(); it++ )
 		{
-			if ( (color[0] == it->src[0]) && (color[1] == it->src[1]) && (color[2] == it->src[2]) )
+			if (color_eq(color[0], it->src[0]) && color_eq(color[1], it->src[1]) && color_eq(color[2], it->src[2]) )
 			{
 				rad->x = radiance * it->dst[0];
 				rad->y = radiance * it->dst[1];
@@ -511,7 +527,7 @@ static void qdx_light_color_to_radiance(remixapi_Float3D* rad, int light_type, c
 	}
 }
 
-static void qdx_light_color_to_radiance_flashlight(remixapi_Float3D* rad, int light_type, int idx, const vec3_t color)
+static void qdx_light_color_to_radiance_flashlight(remixapi_Float3D* rad, int light_type, int idx, const float *color)
 {
 	float radiance = 1.0f;
 	if ( light_type == LIGHT_FLASHLIGHT )
@@ -661,6 +677,14 @@ void qdx_lights_clear(unsigned int light_types)
 				}
 			}
 		}
+		if (light_types & LIGHT_DISTANT)
+		{
+			if (g_distantlight_handle)
+			{
+				remixInterface.DestroyLight(g_distantlight_handle);
+				g_distantlight_handle = 0;
+			}
+		}
 	}
 }
 
@@ -711,9 +735,22 @@ void qdx_lights_draw()
 			}
 		}
 	}
+	if (g_distantlight_handle)
+	{
+		remixInterface.DrawLightInstance(g_distantlight_handle);
+	}
 }
 
-#define DYNAMIC_LIGHTS_USE_DX9 0
+
+union LightInfoData_u
+{
+	remixapi_LightInfoSphereEXT sphere;
+	remixapi_LightInfoCylinderEXT cylinder;
+	remixapi_LightInfoDistantEXT distant;
+};
+static void* fill_in_light_data(int light_type, union LightInfoData_u &data, light_override_t* ovr, const float* position, float radius);
+static void  apply_flashlight_offsets(const float* position, const float* direction, D3DXVECTOR3* outpos, D3DXVECTOR3* outdir);
+
 
 int qdx_light_add(int light_type, int ord, const float *position, const float *direction, const float *color, float radius)
 {
@@ -732,11 +769,7 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 
 	if (light_type == LIGHT_DYNAMIC)
 	{
-#if DYNAMIC_LIGHTS_USE_DX9
-		hash = hashord;
-#else
 		hash = hashpos;
-#endif
 	}
 	if (light_type == LIGHT_CORONA)
 	{
@@ -779,37 +812,24 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 			qdx_lights_clear( LIGHT_FLASHLIGHT );
 		}
 
+		D3DXVECTOR3 tpos, tdir;
+		apply_flashlight_offsets(position, direction, &tpos, &tdir);
+
 		for ( int i = 0; i < NUM_FLASHLIGHT_HND; i++ )
 		{
 
 			remixapi_LightInfoSphereEXT light_sphere;
 			ZeroMemory( &light_sphere, sizeof( light_sphere ) );
 
-			D3DXVECTOR3 tpos, tdir;
-			D3DXMATRIX invview, viewrot;
-			const D3DXVECTOR3 updir( 0, 0, 1 );
-			const D3DXVECTOR3 zero( 0, 0, 1 );
-			D3DXMatrixLookAtRH( &viewrot, &zero, (D3DXVECTOR3*)FLASHLIGHT_DIRECTION_CACHE, &updir );
-			//D3DGlobal_GetCamera( &viewrot );
-			viewrot._41 = 0.0;
-			viewrot._42 = 0.0;
-			viewrot._43 = 0.0;
-			D3DXMatrixInverse( &invview, NULL, (D3DXMATRIX*)&viewrot );
-			D3DXVec3TransformCoord( &tpos, (D3DXVECTOR3*)FLASHLIGHT_POSITION_OFFSET, &invview );
-			D3DXVec3TransformNormal( &tdir, (D3DXVECTOR3*)FLASHLIGHT_DIRECTION_OFFSET, &invview );
-
 			light_sphere.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_SPHERE_EXT;
-			light_sphere.position.x = tpos.x + position[0];
-			light_sphere.position.y = tpos.y + position[1];
-			light_sphere.position.z = tpos.z + position[2];
+			light_sphere.position.x = tpos.x;
+			light_sphere.position.y = tpos.y;
+			light_sphere.position.z = tpos.z;
 			light_sphere.radius = 1.0f;
 			light_sphere.volumetricRadianceScale = FLASHLIGHT_VOLUMETRIC[i];
 
 			light_sphere.shaping_hasvalue = 1;
 			{
-				tdir.x += direction[0];
-				tdir.y += direction[1];
-				tdir.z += direction[2];
 				D3DXVec3Normalize( (D3DXVECTOR3*)&light_sphere.shaping_value.direction, &tdir );
 				light_sphere.shaping_value.coneAngleDegrees = FLASHLIGHT_CONE_ANGLES[i];
 				light_sphere.shaping_value.coneSoftness = FLASHLIGHT_CONE_SOFTNESS[i];
@@ -824,12 +844,12 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 			lightinfo.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO;
 			lightinfo.pNext = &light_sphere;
 			lightinfo.hash = fhash;
-			qdx_light_color_to_radiance_flashlight( &lightinfo.radiance, light_type, i, FLASHLIGHT_COLORS[i] );
+			qdx_light_color_to_radiance_flashlight( &lightinfo.radiance, light_type, i, &FLASHLIGHT_COLORS[i][0]);
 
 			rercd = remixInterface.CreateLight( &lightinfo, &g_flashlight_handle[i] );
 			if ( rercd != REMIXAPI_ERROR_CODE_SUCCESS )
 			{
-				//ri.Printf( PRINT_ERROR, "RMX failed to create flashlight %d\n", rercd );
+				rmx_console_printf(PRINT_ERROR, "RMX failed to create flashlight %d\n", rercd );
 				return 0;
 			}
 			ret = 1;
@@ -837,40 +857,62 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 
 		return ret;
 	}
-
-	if (remixOnline)
+	if (light_type == LIGHT_DISTANT)
 	{
-		light_override_t* ovr = qdx_light_find_override( hash );
-
-		remixapi_LightInfoSphereEXT light_sphere;
-		ZeroMemory( &light_sphere, sizeof(light_sphere) );
-
-		light_sphere.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_SPHERE_EXT;
-		//light_sphere.pNext = &obj_pick;
-		if ( ovr == NULL )
+		if (!remixOnline)
 		{
-			light_sphere.position.x = position[0];
-			light_sphere.position.y = position[1];
-			light_sphere.position.z = position[2];
-			light_sphere.radius = qdx_light_radius( light_type, radius );
-			light_sphere.shaping_hasvalue = 0;
-			light_sphere.volumetricRadianceScale = 0.0f;
+			return 0;
 		}
-		else
+
+		hash = DISTANTLIGHT_HASH;
+
+		if (0 && g_distantlight_handle) //destroying a light creates artifacts; light props get updated regardless
 		{
-			light_sphere.position.x = position[0] + ovr->position_offset[0];
-			light_sphere.position.y = position[1] + ovr->position_offset[1];
-			light_sphere.position.z = position[2] + ovr->position_offset[2];
-			light_sphere.radius = qdx_light_radius_override( light_type, radius, ovr );
-			light_sphere.shaping_hasvalue = 0;
-			light_sphere.volumetricRadianceScale = ovr->volumetric_scale;
+			qdx_lights_clear(LIGHT_DISTANT);
 		}
+
+		remixapi_LightInfoDistantEXT light_distant;
+		ZeroMemory(&light_distant, sizeof(light_distant));
+
+		light_distant.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_DISTANT_EXT;
+		D3DXVec3Normalize((D3DXVECTOR3*)&light_distant.direction, (D3DXVECTOR3*)direction);
+		//light_distant.direction.x = direction[0];
+		//light_distant.direction.y = direction[1];
+		//light_distant.direction.z = direction[2];
+		light_distant.angularDiameterDegrees = 4.0f;
+		light_distant.volumetricRadianceScale = 1.0f;
 
 		remixapi_LightInfo lightinfo;
 		ZeroMemory(&lightinfo, sizeof(lightinfo));
 
 		lightinfo.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO;
-		lightinfo.pNext = &light_sphere;
+		lightinfo.pNext = &light_distant;
+		lightinfo.hash = DISTANTLIGHT_HASH;
+		lightinfo.radiance.x = color[0];
+		lightinfo.radiance.y = color[1];
+		lightinfo.radiance.z = color[2];
+
+		rercd = remixInterface.CreateLight(&lightinfo, &g_distantlight_handle);
+		if (rercd != REMIXAPI_ERROR_CODE_SUCCESS || !g_distantlight_handle)
+		{
+			rmx_console_printf(PRINT_ERROR, "RMX failed to create distant light %d\n", rercd );
+			return 0;
+		}
+		ret = 1;
+
+		return ret;
+	}
+
+	if (remixOnline)
+	{
+		union LightInfoData_u light_data;
+		light_override_t* ovr = qdx_light_find_override( hash );
+
+		remixapi_LightInfo lightinfo;
+		ZeroMemory(&lightinfo, sizeof(lightinfo));
+
+		lightinfo.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO;
+		lightinfo.pNext = fill_in_light_data(light_type, light_data, ovr, position, radius);
 		lightinfo.hash = hash;
 		if ( ovr == NULL )
 		{
@@ -901,7 +943,7 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 			rercd = remixInterface.CreateLight( &lightinfo, &light_store->handle );
 			if ( rercd != REMIXAPI_ERROR_CODE_SUCCESS )
 			{
-				//ri.Printf( PRINT_ERROR, "RMX failed to create light %d\n", rercd );
+				rmx_console_printf(PRINT_ERROR, "RMX failed to create light %d\n", rercd );
 				return 0;
 			}
 			light_store->hash = hash;
@@ -919,6 +961,68 @@ int qdx_light_add(int light_type, int ord, const float *position, const float *d
 	return ret;
 }
 
+static void *fill_in_light_data(int light_type, union LightInfoData_u& data, light_override_t* ovr, const float *position, float radius)
+{
+	switch (light_type)
+	{
+	case LIGHT_DYNAMIC:{
+		remixapi_LightInfoSphereEXT &light_sphere = data.sphere;
+		ZeroMemory(&light_sphere, sizeof(light_sphere));
+		light_sphere.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_SPHERE_EXT;
+
+		if (ovr == NULL)
+		{
+			light_sphere.position.x = position[0];
+			light_sphere.position.y = position[1];
+			light_sphere.position.z = position[2];
+			light_sphere.radius = qdx_light_radius(light_type, radius);
+			light_sphere.shaping_hasvalue = 0;
+			light_sphere.volumetricRadianceScale = 0.0f;
+		}
+		else
+		{
+			light_sphere.position.x = position[0] + ovr->position_offset[0];
+			light_sphere.position.y = position[1] + ovr->position_offset[1];
+			light_sphere.position.z = position[2] + ovr->position_offset[2];
+			light_sphere.radius = qdx_light_radius_override(light_type, radius, ovr);
+			light_sphere.shaping_hasvalue = 0;
+			light_sphere.volumetricRadianceScale = ovr->volumetric_scale;
+		}
+		break;}
+	case LIGHT_CORONA:{
+		remixapi_LightInfoCylinderEXT &light_cylinder = data.cylinder;
+		ZeroMemory(&light_cylinder, sizeof(light_cylinder));
+		light_cylinder.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_CYLINDER_EXT;
+
+		if (ovr == NULL)
+		{
+			light_cylinder.position.x = position[0];
+			light_cylinder.position.y = position[1];
+			light_cylinder.position.z = position[2];
+			light_cylinder.radius = qdx_light_radius(light_type, radius);
+			light_cylinder.volumetricRadianceScale = 0.0f;
+		}
+		else
+		{
+			light_cylinder.position.x = position[0] + ovr->position_offset[0];
+			light_cylinder.position.y = position[1] + ovr->position_offset[1];
+			light_cylinder.position.z = position[2] + ovr->position_offset[2];
+			light_cylinder.radius = qdx_light_radius_override(light_type, radius, ovr);
+			light_cylinder.volumetricRadianceScale = ovr->volumetric_scale;
+		}
+		vec3_t anglevec;
+		AngleVectors(&LIGHT_CYLINDER_AXIS[1][0], NULL, NULL, anglevec);
+		light_cylinder.axis.x = anglevec[0];
+		light_cylinder.axis.y = anglevec[1];
+		light_cylinder.axis.z = anglevec[2];
+		light_cylinder.axisLength = LIGHT_CYLINDER_LEN[1];
+		break;}
+	}
+
+	return &data;
+}
+
+#define VectorClear( a )              ( ( a )[0] = ( a )[1] = ( a )[2] = 0 )
 #define VectorSubtract( a,b,c )   ( ( c )[0] = ( a )[0] - ( b )[0],( c )[1] = ( a )[1] - ( b )[1],( c )[2] = ( a )[2] - ( b )[2] )
 
 vec_t VectorLength( const vec3_t v ) {
@@ -934,4 +1038,139 @@ vec_t Distance( const vec3_t p1, const vec3_t p2 ) {
 
 	VectorSubtract( p2, p1, v );
 	return VectorLength( v );
+}
+
+vec_t VectorNormalize2(const vec3_t v, vec3_t out) {
+	float length, ilength;
+
+	length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+	length = sqrt(length);
+
+	if (length) {
+		ilength = 1 / length;
+		out[0] = v[0] * ilength;
+		out[1] = v[1] * ilength;
+		out[2] = v[2] * ilength;
+	}
+	else {
+		VectorClear(out);
+	}
+
+	return length;
+
+}
+
+#ifndef M_PI
+#define M_PI        3.14159265358979323846f // matches value in gcc v2 math.h
+#endif
+
+// angle indexes
+#define PITCH               0       // up / down
+#define YAW                 1       // left / right
+#define ROLL                2       // fall over
+
+void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up) {
+	float angle;
+	static float sr, sp, sy, cr, cp, cy;
+	// static to help MS compiler fp bugs
+
+	angle = angles[YAW] * (M_PI * 2 / 360);
+	sy = sin(angle);
+	cy = cos(angle);
+	angle = angles[PITCH] * (M_PI * 2 / 360);
+	sp = sin(angle);
+	cp = cos(angle);
+	angle = angles[ROLL] * (M_PI * 2 / 360);
+	sr = sin(angle);
+	cr = cos(angle);
+
+	if (forward) {
+		forward[0] = cp * cy;
+		forward[1] = cp * sy;
+		forward[2] = -sp;
+	}
+	if (right) {
+		right[0] = (-1 * sr * sp * cy + -1 * cr * -sy);
+		right[1] = (-1 * sr * sp * sy + -1 * cr * cy);
+		right[2] = -1 * sr * cp;
+	}
+	if (up) {
+		up[0] = (cr * sp * cy + -sr * -sy);
+		up[1] = (cr * sp * sy + -sr * cy);
+		up[2] = cr * cp;
+	}
+}
+
+static void apply_flashlight_offsets(const float* position, const float* direction, D3DXVECTOR3* outpos, D3DXVECTOR3* outdir)
+{
+#if 0
+	D3DXMATRIX invview, viewrot;
+	const D3DXVECTOR3 updir(0, 0, 1);
+	const D3DXVECTOR3 zero(0, 0, 0);
+	D3DXVECTOR3 playerDir(direction[0], direction[1], direction[2]);
+	D3DXMatrixLookAtRH(&viewrot, &zero, &playerDir, &updir);
+	//D3DGlobal_GetCamera( &viewrot );
+	viewrot._41 = 0.0;
+	viewrot._42 = 0.0;
+	viewrot._43 = 0.0;
+	D3DXMatrixInverse(&invview, NULL, (D3DXMATRIX*)&viewrot);
+	D3DXVec3TransformCoord(outpos, (D3DXVECTOR3*)FLASHLIGHT_POSITION_OFFSET, &invview);
+	outpos->x += position[0];
+	outpos->y += position[1];
+	outpos->z += position[2];
+	D3DXVec3TransformNormal(outdir, (D3DXVECTOR3*)FLASHLIGHT_DIRECTION_OFFSET, &invview);
+	outdir->x += direction[0];
+	outdir->y += direction[1];
+	outdir->z += direction[2];
+#else
+	// 1. Setup the player's base vectors
+	D3DXVECTOR3 playerDir(direction[0], direction[1], direction[2]);
+	D3DXVec3Normalize(&playerDir, &playerDir);
+
+	// id Tech uses Z-Up
+	D3DXVECTOR3 worldUp(0.0f, 0.0f, 1.0f);
+
+	// 2. Calculate the Local Axes (Right, Up, Forward)
+	D3DXVECTOR3 right, localUp;
+
+	// Right vector is perpendicular to Forward and WorldUp
+	D3DXVec3Cross(&right, &playerDir, &worldUp);
+	D3DXVec3Normalize(&right, &right);
+
+	// True local Up vector is perpendicular to Right and Forward
+	D3DXVec3Cross(&localUp, &right, &playerDir);
+	D3DXVec3Normalize(&localUp, &localUp);
+
+	// Emulate OpenGL / id Tech Right-Handed space (-Z is Forward)
+	D3DXVECTOR3 engineZ(-playerDir.x, -playerDir.y, -playerDir.z);
+
+	// 3. Apply the Position Offset
+	D3DXVECTOR3 posOffset = *((D3DXVECTOR3*)FLASHLIGHT_POSITION_OFFSET);
+
+	// Use engineZ so a positive offset pushes backward, matching original game data
+	outpos->x = position[0] + (right.x * posOffset.x) + (localUp.x * posOffset.y) + (engineZ.x * posOffset.z);
+	outpos->y = position[1] + (right.y * posOffset.x) + (localUp.y * posOffset.y) + (engineZ.y * posOffset.z);
+	outpos->z = position[2] + (right.z * posOffset.x) + (localUp.z * posOffset.y) + (engineZ.z * posOffset.z);
+
+	// 4. Direction Offset (Treating as Radians)
+	float pitch = ((float*)FLASHLIGHT_DIRECTION_OFFSET)[0]; // Up/Down rotation
+	float yaw = ((float*)FLASHLIGHT_DIRECTION_OFFSET)[1]; // Left/Right rotation
+	float roll = ((float*)FLASHLIGHT_DIRECTION_OFFSET)[2]; // Twist
+
+	// Create a rotation matrix from the radians
+	D3DXMATRIX localRot;
+	D3DXMatrixRotationYawPitchRoll(&localRot, yaw, pitch, roll);
+
+	// The flashlight points "forward" (Z=-1) by default in OpenGL local space
+	D3DXVECTOR3 localForward(0.0f, 0.0f, -1.0f);
+	D3DXVECTOR3 rotatedLocalForward;
+
+	// Apply the radian angles to the local forward vector
+	D3DXVec3TransformNormal(&rotatedLocalForward, &localForward, &localRot);
+
+	// 5. Convert that local rotated direction into World Space using the engine's Z
+	outdir->x = (right.x * rotatedLocalForward.x) + (localUp.x * rotatedLocalForward.y) + (engineZ.x * rotatedLocalForward.z);
+	outdir->y = (right.y * rotatedLocalForward.x) + (localUp.y * rotatedLocalForward.y) + (engineZ.y * rotatedLocalForward.z);
+	outdir->z = (right.z * rotatedLocalForward.x) + (localUp.z * rotatedLocalForward.y) + (engineZ.z * rotatedLocalForward.z);
+#endif
 }

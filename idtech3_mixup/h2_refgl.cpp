@@ -21,6 +21,15 @@
 #include "fnvhash/fnv.h"
 #include <intrin.h>
 
+#if !id386
+//for non 32-bit define empty functions
+void h2_refgl_init() {}
+void h2_refgl_deinit() {}
+void h2_refgl_frame_ended() {}
+#else
+
+#define NORMALS_KEEP_AREA_WEIGHT 1
+
 typedef float vec_t;
 typedef float vec3_t[3];
 typedef float matrix3_t[3][3];
@@ -352,6 +361,7 @@ typedef struct cvar_s
 #define RI_CVAR_GET 5
 #define RI_CVAR_SET 7
 #define RI_ADDCMD 9
+#define RI_REMCMD 10
 #define RI_EXECTXT 0xd
 
 #define riPRINTF(LVL,...) ((ri_Printf)dp_ri[RI_PRINTF_OFF])( LVL, __VA_ARGS__ )
@@ -360,6 +370,7 @@ typedef struct cvar_s
 #define riCVAR_SET(NAME,VAL) ((ri_Cvar_Set)dp_ri[RI_CVAR_SET] )(NAME,VAL)
 #define riEXEC_TEXT(WHEN,TEXT) ((ri_Cbuf_ExecuteText)dp_ri[RI_EXECTXT])(WHEN,TEXT)
 #define riADD_CMD(NAME,FN) ((ri_AddCommand)dp_ri[RI_ADDCMD])(NAME,FN)
+#define riREM_CMD(NAME) ((ri_RemoveCommand)dp_ri[RI_REMCMD])(NAME)
 
 #define vecmax(a,m)             ((a) > m ? m : (a))
 
@@ -412,6 +423,7 @@ typedef cvarq2_t* (*ri_Cvar_Get) (const char *name, const char *value, int flags
 typedef cvarq2_t* (*ri_Cvar_Set)( const char *name, const char *value );
 typedef void (*ri_Cbuf_ExecuteText)( int exec_when, const char *text );
 typedef void (*ri_AddCommand)(const char* name, void (*cmd)(void));
+typedef void (*ri_RemoveCommand) (const char* name);
 
 static intptr_t* dp_ri;// = 0x5fd60
 
@@ -455,6 +467,7 @@ int *dp_currenttmu;// = 0x5ff78
 #define currenttmu (*dp_currenttmu)
 int *currenttexture;// = 0x5ff70
 float *r_turbsin;// = 0x30684
+float *skymins_0, *skymins_1, *skymaxs_0, *skymaxs_1;
 static cvarq2_t* r_fullbright;
 static cvarq2_t* gl_drawflat;
 static cvarq2_t* gl_sortmulti;
@@ -470,6 +483,9 @@ static cvarq2_t* rmx_coronas;
 static cvarq2_t* rmx_generic;
 static cvarq2_t* rmx_dyn_linger;
 static cvarq2_t* rmx_alphacull;
+static cvarq2_t* rmx_nowateranim;
+static cvarq2_t* rmx_noflooranim;
+static cvarq2_t* rmx_logtextures;
 
 static image_t* (*R_TextureAnimation)(const mtexinfo_t* tex);// = 0xae70;
 static void (APIENTRY** fp_qglMultiTexCoord2fARB)(GLenum target, GLfloat s, GLfloat t);// = 0x53428 0x53770
@@ -485,6 +501,7 @@ static void (*GL_MBind)(GLenum target, int texnum);// = 0x3650
 static void (*GL_EnableMultitexture)( qboolean enable );// = 0x33a0
 static qboolean (*R_CullAliasModel)( vec3_t bbox[8], void* /*entity_t* e*/ );// = 0x2b20
 static image_t* (*GL_FindImage)( const char* name, const imagetype_t type );// = 0x4090
+static image_t* (*GetSkin)(void);// = 0x2070
 }
 
 #define PTR_FROM_OFFSET(typecast, offset) (typecast)((intptr_t)(offset) + (intptr_t)ref_gl_data.lpBaseOfDll)
@@ -498,6 +515,7 @@ static image_t *r_whiteimage = NULL;
 typedef struct drawSurf_s {
 	unsigned    sort;
 	msurface_t *surface;
+	unsigned    flags;
 } drawSurf_t;
 
 #define MAX_DRAWSURFS           0x10000
@@ -507,6 +525,7 @@ typedef struct {
 } surfList_t;
 
 static surfList_t g_surfList = { 0 };
+static int g_draw_fullsky_requested = 0;
 
 static void h2_intercept_RecursiveWorldNode( mnode_t* node );
 static qboolean h2_intercept_R_CullAliasModel( vec3_t bbox[8], void* e /*entity_t* e*/ );
@@ -515,6 +534,7 @@ static void h2_check_crtent_frame_vs_oldframe();
 static void R_RecursiveWorldNodeEx( mnode_t* node, BOOL inpvs );
 static void R_SortAndDrawSurfaces( drawSurf_t* surfs, int numSurfs );
 static void R_AddDrawSurf( msurface_t* surf );
+static void h2_DrawFullSky();
 
 static void h2_generic_fixes();
 static void h2_generic_fixes_deinit();
@@ -553,6 +573,10 @@ void h2_refgl_init()
 			dp_currenttmu = PTR_FROM_OFFSET( int*, 0x5ff78 );
 			currenttexture = PTR_FROM_OFFSET( int*, 0x5ff70 );
 			r_turbsin = PTR_FROM_OFFSET( float*, 0x30684 );
+			skymins_0 = PTR_FROM_OFFSET(float*, 0x5fb00);
+			skymins_1 = PTR_FROM_OFFSET(float*, 0x5fb18);
+			skymaxs_0 = PTR_FROM_OFFSET(float*, 0x5fa60);
+			skymaxs_1 = PTR_FROM_OFFSET(float*, 0x5fa78);
 
 			R_TextureAnimation = (image_t*(*)(const mtexinfo_t *))((intptr_t)0xae70 + (intptr_t)ref_gl_data.lpBaseOfDll);
 			fp_qglMultiTexCoord2fARB = (void (APIENTRY **)(GLenum,GLfloat,GLfloat))((intptr_t)0x53770 + (intptr_t)ref_gl_data.lpBaseOfDll);
@@ -566,6 +590,7 @@ void h2_refgl_init()
 			GL_EnableMultitexture = (void (*)(qboolean))((intptr_t)0x33a0 + (intptr_t)ref_gl_data.lpBaseOfDll);
 			R_CullAliasModel = PTR_FROM_OFFSET( qboolean (*)(vec3_t [],void *), 0x2b20 );
 			GL_FindImage = PTR_FROM_OFFSET( image_t *(*)(const char *,const imagetype_t), 0x4090 );
+			GetSkin = PTR_FROM_OFFSET(image_t * (*)(void), 0x2070);
 
 			//sanity check: ideally we'd want to map this to quake2.dll
 			intptr_t fp = dp_ri[RI_CVAR_GET];
@@ -589,6 +614,9 @@ void h2_refgl_init()
 			rmx_dyn_linger = riCVAR_GET("rmx_dyn_linger", "1", 1);
 			rmx_coronas = riCVAR_GET("rmx_coronas", "1", 1);
 			rmx_alphacull = riCVAR_GET("rmx_alphacull", "0", 1);
+			rmx_nowateranim = riCVAR_GET("rmx_nowateranim", "0", 1);
+			rmx_noflooranim = riCVAR_GET("rmx_noflooranim", "0", 1);
+			rmx_logtextures = riCVAR_GET("rmx_logtextures", "0", 0);
 
 			riADD_CMD( "rmx_flashlight_toggle", h2_flashlight_toggle );
 
@@ -811,6 +839,8 @@ void h2_refgl_deinit()
 		//GL_DrawFlexFrameLerp draws the vertices
 		//8b 2f 83 c7 this is where the draw loop starts
 		//we can't restore it unless we save the bytes
+
+		riREM_CMD( "rmx_flashlight_toggle" );
 	}
 
 	h2_generic_fixes_deinit();
@@ -829,6 +859,7 @@ static void h2_intercept_RecursiveWorldNode( mnode_t* node )
 	HOOK_ONLINE_NOTICE();
 
 	g_surfList.numSurfs = 0;
+	g_draw_fullsky_requested = 0;
 
 	glPushDebugGroup(0, 0, -1, "R_RecursiveWorldNodeEx");
 
@@ -1016,7 +1047,8 @@ static void R_RecursiveWorldNodeEx(mnode_t* node, BOOL inpvs)
 		if (surf->texinfo->flags & SURF_SKY)
 		{
 			// Just adds to visible sky bounds
-			R_AddSkySurface(surf);
+			//R_AddSkySurface(surf);
+			h2_DrawFullSky();
 		}
 		else if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
 		{
@@ -1082,7 +1114,8 @@ static void R_RecursiveWorldNodeEx(mnode_t* node, BOOL inpvs)
 			if (surf->texinfo->flags & SURF_SKY)
 			{
 				// Just adds to visible sky bounds
-				R_AddSkySurface(surf);
+				//R_AddSkySurface(surf);
+				h2_DrawFullSky();
 			}
 			else if (surf->texinfo->flags & (SURF_TRANS33 | SURF_TRANS66))
 			{
@@ -1143,9 +1176,12 @@ union sort_pack_u
 	} bits;
 };
 
+static bool h2_should_compute_normals(const image_t* image);
+
 static void R_AddDrawSurf(msurface_t *surf)
 {
 	int index;
+	bool normals = rmx_normals->value > 0;
 
 	index = g_surfList.numSurfs;
 	if ( index < MAX_DRAWSURFS )
@@ -1176,7 +1212,13 @@ static void R_AddDrawSurf(msurface_t *surf)
 			}
 		}
 
-		sort.bits.texnum = R_TextureAnimation( surf->texinfo )->texnum;
+		unsigned surflags = 0;
+		image_t* image = R_TextureAnimation(surf->texinfo);
+		if (normals && h2_should_compute_normals(image))
+		{
+			surflags |= RECALC_NORMALS | RENDER_NORMALS;
+		}
+		sort.bits.texnum = image->texnum;
 		sort.bits.flowing = 0;// surf->texinfo->flags& SURF_FLOWING;
 		if ( rmx_skiplightmaps->value )
 			sort.bits.lightmap = SKIP_LIGHTMAP;
@@ -1185,6 +1227,7 @@ static void R_AddDrawSurf(msurface_t *surf)
 
 		g_surfList.surfs[index].sort = sort.all;
 		g_surfList.surfs[index].surface = surf;
+		g_surfList.surfs[index].flags = surflags;
 		g_surfList.numSurfs++;
 	}
 	else
@@ -1224,7 +1267,10 @@ static void R_SortAndDrawSurfaces( drawSurf_t* surfs, int numSurfs )
 		{
 			//render what was accumulated so far, with the bound textures
 			R_RenderSurfs(flags);
+			flags = 0;
 		}
+
+		flags |= s->flags;
 
 		//check if new textures need to be bound
 		if ( sort.bits.dynamic )
@@ -1265,16 +1311,15 @@ static void R_SortAndDrawSurfaces( drawSurf_t* surfs, int numSurfs )
 
 			GL_MBind( /*GL_TEXTURE0_SGIS*/GL_TEXTURE0, sort.bits.texnum/*image->texnum*/ );
 			GL_MBind( /*GL_TEXTURE1_SGIS*/GL_TEXTURE1, /*gl_state.lightmap_textures*/gl_state_lightmap_textures + lmtex );
-			flags = RENDER_TWOTEXTURES;
+			flags |= RENDER_TWOTEXTURES;
 		}
 		else if( oldTexnum != sort.bits.texnum || oldLightmap != sort.bits.lightmap )
 		{
-			flags = 0;
 			GL_MBind( /*GL_TEXTURE0_SGIS*/GL_TEXTURE0, sort.bits.texnum/*image->texnum*/ );
 			if ( sort.bits.lightmap != SKIP_LIGHTMAP )
 			{
 				GL_MBind( /*GL_TEXTURE1_SGIS*/GL_TEXTURE1, /*gl_state.lightmap_textures*/gl_state_lightmap_textures + sort.bits.lightmap/*lmtex*/ );
-				flags = RENDER_TWOTEXTURES;
+				flags |= RENDER_TWOTEXTURES;
 			}
 		}
 		oldSort = sort.all;
@@ -1291,7 +1336,7 @@ static void R_SortAndDrawSurfaces( drawSurf_t* surfs, int numSurfs )
 
 typedef union colorinfo_u
 {
-	byte b[4];
+	byte b[4]; //bgra
 	unsigned all;
 } colorinfo_t;
 
@@ -1389,6 +1434,13 @@ static void R_Model_BuildVBuffAndDraw(int *order, float *normals_array, int *p_a
 {
 	HOOK_ONLINE_NOTICE();
 
+	fstack_save_data_t fps;
+	uint32_t fpsc = check_fp_stack(FPSTK_IGNORE, &fps);
+	if (fpsc)
+	{
+		riPRINTF(PRINT_ALL, "Warning: R_Model_BuildVBuffAndDraw: FP stack size: %d\n", fpsc);
+	}
+
 	//if ( g_calcnormals != normals_array )
 	//{
 	//	__debugbreak();
@@ -1401,7 +1453,38 @@ static void R_Model_BuildVBuffAndDraw(int *order, float *normals_array, int *p_a
 
 	uint32_t render_flags = 0;
 	if(rmx_normals->value)
+	{
 		render_flags |= RENDER_NORMALS;
+
+		image_t* image = GetSkin();
+		if (h2_should_compute_normals(image))
+		{
+			render_flags |= RECALC_NORMALS;
+		}
+	}
+
+	uint32_t currententity_flags;
+	memcpy(&currententity_flags, &currententity[0x30], sizeof(uint32_t));
+
+	unsigned char alpha = currententity[0x2f];//currententity->color.a;
+	if ((currententity_flags & 0x4000) == 0)
+	{ //not TRANS_ADD
+		if ((currententity_flags & 0x10000) == 0)
+		{ //not TRANS_GHOST
+			alpha = 255;
+		}
+	}
+	else if ((currententity_flags & 0x8000) == 0)
+	{ //not TRANS_ADD_ALPHA
+		if ((currententity_flags & 0x20000) == 0)
+		{ //not ALPHA_TEXTURE
+			alpha = 255;
+		}
+	}
+	else if ((currententity_flags & 0x20000) == 0)
+	{
+		alpha = 255;
+	}
 	
 	while ( 1 )
 	{
@@ -1424,7 +1507,6 @@ static void R_Model_BuildVBuffAndDraw(int *order, float *normals_array, int *p_a
 		int index_xyz;
 		struct vertexData_s* vb;
 		unsigned short* ib;
-		unsigned char alpha = 255;// (*p_alpha) ? 255 : 127;
 
 		int totalindexes = (3 * count) - 6;
 		R_CheckDrawBufferSpace( count, totalindexes, render_flags );
@@ -1490,11 +1572,19 @@ static void R_Model_BuildVBuffAndDraw(int *order, float *normals_array, int *p_a
 						normals = normals_array + index_xyz * 3;
 					}
 					//qglColor4f (l* shadelight[0], l*shadelight[1], l*shadelight[2], alpha);
+#if 0
+					//use vertex light
 					vec3_t colors;
 					float colorscale = l * 255;
 					VectorScale( shadelight, colorscale, colors );
 					VectorCopyClamp( colors, vb->clr.b, 255 );
 					vb->clr.b[3] = alpha;
+#else
+					vb->clr.b[0] = 255;
+					vb->clr.b[1] = 255;
+					vb->clr.b[2] = 255;
+					vb->clr.b[3] = alpha;
+#endif
 				}
 				float* vsrc = s_lerped + index_xyz * 3;
 				//qglVertex3fv (s_lerped[index_xyz]);
@@ -1552,37 +1642,53 @@ static inline int h2_vertexes_compare2( const struct vertexData_s* a, const stru
 {
 	const float epsilon = 1e-9f;
 
-	const float dx = a->xyz[0] - b->xyz[0];
-	if ( abs( dx ) < epsilon )
+	for (int i = 0; i < 3; i++)
 	{
-		const float dy = a->xyz[1] - b->xyz[1];
-		if ( abs( dy ) < epsilon )
-		{
-			const float dz = a->xyz[2] - b->xyz[2];
-			if ( abs( dz ) < epsilon )
-			{
-				return 0;
-			}
-			else return (signbit( dz ) ? -1 : 1);
-		}
-		else return (signbit(dy) ? -1 : 1);
+		const float d = a->xyz[i] - b->xyz[i];
+		if (d > epsilon) return 1;
+		if (d < -epsilon) return -1;
 	}
-	else return (signbit( dx ) ? -1 : 1);
+
+	return 0;
+}
+
+static inline int h2_normals_compare2(const struct vertexData_s* a, const struct vertexData_s* b)
+{
+	const float epsilon = 1e-9f;
+
+	float dotAB = DotProduct(a->normal, b->normal);
+
+	// 1. Check if they point in the same general direction
+	if (dotAB <= 0.0f) {
+		return 1;
+	}
+
+	// 2. Check for strict colinearity using squared values
+	float magSqA = DotProduct(a->normal, a->normal);
+	float magSqB = DotProduct(b->normal, b->normal);
+
+	// Mathematically: cos(theta)^2 = (a.b)^2 / (|a|^2 * |b|^2)
+	// We rearrange to avoid division: (a.b)^2 >= (|a|^2 * |b|^2) * (1 - epsilon)
+	return !((dotAB * dotAB) >= (magSqA * magSqB) * (1.0f - epsilon));
 }
 
 static int h2_vertexes_compare( void const* x0, void const* x1 )
 {
 	const struct vertexData_s * a = &g_drawBuff.vertexes[*((uint16_t*)x0)];
 	const struct vertexData_s * b = &g_drawBuff.vertexes[*((uint16_t*)x1)];
-	int res = h2_vertexes_compare2( a, b );
 
-	if ( res == 0 )
-	{
-		if ( a < b )
-			return -1;
-		return 1;
-	}
-	return res;
+	if (a->xyz[0] != b->xyz[0]) return (a->xyz[0] < b->xyz[0]) ? -1 : 1;
+	if (a->xyz[1] != b->xyz[1]) return (a->xyz[1] < b->xyz[1]) ? -1 : 1;
+	if (a->xyz[2] != b->xyz[2]) return (a->xyz[2] < b->xyz[2]) ? -1 : 1;
+	return 0;
+}
+
+static inline int IsVertexClose(const struct vertexData_s* a, const struct vertexData_s* b) {
+	const float epsilon = 1e-5f;
+	float dx = a->xyz[0] - b->xyz[0];
+	float dy = a->xyz[1] - b->xyz[1];
+	float dz = a->xyz[2] - b->xyz[2];
+	return (dx * dx + dy * dy + dz * dz) < (epsilon * epsilon);
 }
 
 inline int IsVectorZero( const vec3_t v )
@@ -1592,41 +1698,44 @@ inline int IsVectorZero( const vec3_t v )
 
 inline void MergeNormal( const vec3_t normal, uint index, const uint16_t* remapvpos )
 {
-	float* ndst, dot;
-	int vzero;
+	float* ndst;
 	if (remapvpos)
 		index = remapvpos[index];
 	ndst = g_drawBuff.vertexes[index].normal;
 
 	VectorAdd( normal, ndst, ndst );
+#if !NORMALS_KEEP_AREA_WEIGHT
 	VectorNormalize( ndst );
+#endif
 }
+
+static float g_normals_angleval = 0.48f;
 
 static void h2_recalculate_normals()
 {
-	static uint16_t sortvpos[MAX_VERTEXES];
+	static uint16_t sortidx[MAX_VERTEXES];
 	static uint16_t remapvpos[MAX_VERTEXES];
 	static uint16_t dupvpos[2*MAX_VERTEXES];
 
 	for ( int i = 0; i < g_drawBuff.numVertexes; i++ )
 	{
-		sortvpos[i] = i;
+		sortidx[i] = i;
 		remapvpos[i] = i;
 	}
 
 	if ( 1 )
 	{
-		qsort( sortvpos, g_drawBuff.numVertexes, sizeof( uint16_t ), h2_vertexes_compare );
+		qsort( sortidx, g_drawBuff.numVertexes, sizeof( uint16_t ), h2_vertexes_compare );
 
 		uint16_t* it = dupvpos;
 		int count = 0;
-		int backi = sortvpos[0];
+		int backi = sortidx[0];
 		const struct vertexData_s* backv = &g_drawBuff.vertexes[backi];
 		for ( int i = 1; i < g_drawBuff.numVertexes; i++ )
 		{
-			int fronti = sortvpos[i];
+			int fronti = sortidx[i];
 			const struct vertexData_s* frontv = &g_drawBuff.vertexes[fronti];
-			if ( 0 == h2_vertexes_compare2( backv, frontv ) )
+			if (IsVertexClose(backv, frontv))
 			{
 				remapvpos[fronti] = backi;
 				if ( count == 0 )
@@ -1673,7 +1782,9 @@ static void h2_recalculate_normals()
 		VectorSubtract( v0, v1, e1 );
 		VectorSubtract( v2, v1, e2 );
 		CrossProduct( e1, e2, normal );
+#if !NORMALS_KEEP_AREA_WEIGHT
 		VectorNormalize( normal );
+#endif
 		
 		const uint16_t* param = 1 ? NULL : remapvpos;
 
@@ -1685,78 +1796,111 @@ static void h2_recalculate_normals()
 	uint16_t* it = dupvpos;
 	while ( it[0] )
 	{
-		int count = it[0];
-		it++;
+		int total_count = it[0];
+		it++; // 'it' now points to the array of vertex indices
 
-		uint32_t visited = 0;
-		uint32_t visitend = (1 << count) - 1;
-		for ( int i = 0; i < count && visited != visitend; i++ )
+		// Graceful bucketing: process in chunks of max 32
+		for (int chunk_start = 0; chunk_start < total_count; chunk_start += 32)
 		{
-			vec3_t sum;
-			uint32_t visitnow = 0;
-			int indexi = it[i];
-			visited |= 1 << i;
-			float* ni = g_drawBuff.vertexes[indexi].normal;
-			VectorCopy(ni, sum);
-			for ( int j = i + 1; j < count; j++ )
-			{
-				uint32_t visitid = 1 << j;
-				if (visitid & visited)
-					continue;
-
-				int indexj = it[j];
-				float* nj = g_drawBuff.vertexes[indexj].normal;
-				float dot = DotProduct( nj, ni );
-				if ( dot > 0.01f )
-				{
-					VectorAdd(nj, sum, sum);
-					remapvpos[indexj] = indexi;
-					visitnow |= visitid;
+			int count = total_count - chunk_start;
+			if (count > 32) {
+				if (chunk_start == 0) {
+					// Log the error only on the first split
+					PRINT_ONCE("WARNING: Vertex share count %d exceeds 32. Splitting into buckets.\n", total_count);
 				}
-				else if (remapvpos[indexj] == indexi)
+				count = 32;
+			}
+
+			uint16_t* chunk_it = it + chunk_start;
+
+			uint32_t visited = 0;
+			uint32_t visitend = (1 << count) - 1;
+			uint32_t skipadd = 0;
+
+			//mark duplicated normals
+			for (int i = 0; i < count; i++)
+			{
+				int indexi = chunk_it[i];
+				const struct vertexData_s* backv = &g_drawBuff.vertexes[indexi];
+				for (int j = i + 1; j < count; j++)
 				{
-					remapvpos[indexj] = indexj;
+					int indexj = chunk_it[j];
+					const struct vertexData_s* frontv = &g_drawBuff.vertexes[indexj];
+					if (0 == h2_normals_compare2(backv, frontv))
+					{
+						skipadd |= 1 << j;
+					}
 				}
 			}
 
-			VectorNormalize(sum);
-			VectorCopy(sum, ni);
-			for (int j = i + 1; j < count; j++)
+			//go over face combinations, check for angle of surfaces and merge normals
+			for ( int i = 0; i < count && visited != visitend; i++ )
 			{
-				uint32_t visitid = 1 << j;
-				if (visitid & visitnow)
+				vec3_t sum;
+				uint32_t visitnow = 0;
+				int indexi = chunk_it[i];
+				visited |= 1 << i;
+				float* ni = g_drawBuff.vertexes[indexi].normal;
+				//VectorNormalize(ni);
+				VectorCopy(ni, sum);
+				for ( int j = i + 1; j < count; j++ )
 				{
-					int indexj = it[j];
+					uint32_t visitid = 1 << j;
+					if (visitid & visited)
+						continue;
+
+					int indexj = chunk_it[j];
 					float* nj = g_drawBuff.vertexes[indexj].normal;
-					VectorCopy(sum, nj);
+					//VectorNormalize(nj);
+#if NORMALS_KEEP_AREA_WEIGHT
+					// Calculate true cosine regardless of vector length (area)
+					float magSqI = DotProduct(ni, ni);
+					float magSqJ = DotProduct(nj, nj);
+					float magProd = sqrtf(magSqI * magSqJ);
+					float cosTheta = (magProd > 1e-8f) ? (DotProduct(nj, ni) / magProd) : 0.0f;
+
+					if (cosTheta > g_normals_angleval)
+#else
+					float dot = DotProduct( nj, ni );
+					if ( dot > g_normals_angleval )
+#endif
+					{
+						if ((skipadd & visitid) == 0)
+							VectorAdd(nj, sum, sum);
+						//remapvpos[indexj] = indexi;
+						visitnow |= visitid;
+					}
+					else if (remapvpos[indexj] == indexi)
+					{
+						//remapvpos[indexj] = indexj;
+					}
 				}
+
+				VectorNormalize(sum);
+				VectorCopy(sum, ni);
+				for (int j = i + 1; j < count; j++)
+				{
+					uint32_t visitid = 1 << j;
+					if (visitid & visitnow)
+					{
+						int indexj = chunk_it[j];
+						float* nj = g_drawBuff.vertexes[indexj].normal;
+						VectorCopy(sum, nj);
+					}
+				}
+
+				visited |= visitnow;
 			}
 
-			visited |= visitnow;
 		}
+		it += total_count; // Advance the main pointer by the total cluster size
+	}
 
-		//for (int i = 0; i < count; i++)
-		//{
-		//	int index = it[i];
-		//	if (remapvpos[index] != index)
-		//	{
-		//		float* ni = g_drawBuff.vertexes[index].normal;
-		//		MergeNormal(ni, remapvpos[index], NULL);
-		//	}
-		//}
-
-		//for (int i = 0; i < count; i++)
-		//{
-		//	int index = it[i];
-		//	if (remapvpos[index] != index)
-		//	{
-		//		float* ni = g_drawBuff.vertexes[index].normal;
-		//		float* nr = g_drawBuff.vertexes[remapvpos[index]].normal;
-		//		VectorCopy(nr, ni);
-		//	}
-		//}
-
-		it += count;
+	// Final pass: Normalize all vertices for the graphics pipeline
+	struct vertexData_s* v_final = g_drawBuff.vertexes;
+	for (int i = 0; i < g_drawBuff.numVertexes; i++, v_final++)
+	{
+		VectorNormalize(v_final->normal);
 	}
 }
 
@@ -1785,6 +1929,69 @@ static void h2_draw_normals()
 	GL_MBind(GL_TEXTURE0, oldtexture);
 
 	//glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+}
+
+#define WHITE_CLR { 255, 255, 255, 255 }
+static const int SKY_FRONT_IDX = 0;
+static const int SKY_LEFT_IDX = 4;
+static const int SKY_BACK_IDX = 8;
+static const int SKY_RIGHT_IDX = 12;
+static const int SKY_TOP_IDX = 16;
+static const int SKY_BOTTOM_IDX = 20;
+static struct vertexData_s skyverts[] =
+{   // xyz[3] normal[3] clr tex0[2] tex1[2]
+	// front
+	{  0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0 },
+	{ -0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0 },
+	{ -0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0 },
+	{  0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0 },
+
+	//left
+	{  0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0},
+	{  0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0},
+	{  0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0},
+	{  0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0},
+
+	//back
+	{ -0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0},
+	{  0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0},
+	{  0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0},
+	{ -0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0},
+
+	//right
+	{ -0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0},
+	{ -0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0},
+	{ -0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0},
+	{ -0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0},
+
+	//top
+	{ -0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0},
+	{ -0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0},
+	{  0.5f,  0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0},
+	{  0.5f,  0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0},
+
+	//bottom
+	{ -0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  0, 0,  0, 0},
+	{ -0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  0, 1,  0, 0},
+	{  0.5f, -0.5f,  0.5f,  0, 0, 0,  WHITE_CLR,  1, 1,  0, 0},
+	{  0.5f, -0.5f, -0.5f,  0, 0, 0,  WHITE_CLR,  1, 0,  0, 0},
+};
+
+static void h2_DrawFullSky()
+{
+	if (!g_draw_fullsky_requested)
+	{
+		g_draw_fullsky_requested = 1;
+
+		for (int i = 0; i < 6; i++)
+		{
+			//forces full sky to draw
+			skymins_0[i] = -1;
+			skymins_1[i] = -1;
+			skymaxs_0[i] = 1;
+			skymaxs_1[i] = 1;
+		}
+	}
 }
 
 OPENGL_API void WINAPI glClear( GLbitfield mask );
@@ -1822,13 +2029,20 @@ static void R_RenderSurfs( int flags )
 {
 	if ( g_drawBuff.numIndexes )
 	{
-		c_brush_polys++;
+		//c_brush_polys++;
 
-		if ( flags & RECALC_NORMALS || rmx_normals->value >= 2 )
+		if (rmx_normals->value >= 2)
+		{
+			flags |= RECALC_NORMALS;
+			if (rmx_normals->value >= 3)
+			{
+				flags |= RENDER_NORMALS;
+			}
+		}
+
+		if ( flags & RECALC_NORMALS )
 		{
 			h2_recalculate_normals();
-			if ( rmx_normals->value >= 3 )
-				flags |= RENDER_NORMALS;
 		}
 
 		glEnableClientState( GL_VERTEX_ARRAY );
@@ -1894,11 +2108,25 @@ static void hk_R_EmitWaterPolys(msurface_t* fa, qboolean undulate)
 	//take color from previous calls to glColor
 	//if ( D3DState.CurrentState.isSet.bits.color )
 		color = D3DState.CurrentState.currentColor;
+
+	if (rmx_normals->value)
+	{
+		image_t* image = R_TextureAnimation(fa->texinfo);
+		if (h2_should_compute_normals(image))
+		{
+			render_flags |= RENDER_NORMALS | RECALC_NORMALS;
+		}
+	}
 	
 	if (fa->texinfo->flags & SURF_FLOWING)
 		scroll = -64.0f * ((rdt * 0.5f) - floorf(rdt * 0.5f));
 	else
 		scroll = 0.0f;
+
+	if (rmx_nowateranim->value)
+		undulate = qfalse;
+
+	R_RenderSurfs(render_flags);
 
 	for (bp = fa->polys; bp != NULL; bp = bp->next)
 	{
@@ -1978,10 +2206,13 @@ static void hk_R_EmitUnderwaterPolys(msurface_t* fa)
 	//float		scroll;
 	uint32_t	render_flags = 0;
 	DWORD		color = D3DCOLOR_ARGB( 255, 255, 255, 255 );
+	qboolean	undulate = rmx_nowateranim->value ? qfalse : qtrue;
 
 	//take color from previous calls to glColor
 	//if ( D3DState.CurrentState.isSet.bits.color )
 		color = D3DState.CurrentState.currentColor;
+
+	R_RenderSurfs(render_flags);
 
 	for (bp = fa->polys; bp != NULL; bp = bp->next)
 	{
@@ -2022,8 +2253,11 @@ static void hk_R_EmitUnderwaterPolys(msurface_t* fa)
 			//glVertex3fv(v);
 			VectorCopy( v, vb->xyz );
 
-			vb->xyz[2] += r_turbsin[Q_ftol( ((v[0] * 2.3f + v[1]) * 0.015f + rdt * 3.0f) * TURBSCALE ) & 255] * 0.5f +
-					r_turbsin[Q_ftol( ((v[1] * 2.3f + v[0]) * 0.015f + rdt * 6.0f) * TURBSCALE ) & 255] * 0.25f;
+			if ( undulate )
+			{
+				vb->xyz[2] += r_turbsin[Q_ftol(((v[0] * 2.3f + v[1]) * 0.015f + rdt * 3.0f) * TURBSCALE) & 255] * 0.5f +
+					r_turbsin[Q_ftol(((v[1] * 2.3f + v[0]) * 0.015f + rdt * 6.0f) * TURBSCALE) & 255] * 0.25f;
+			}
 
 			vb++;
 			ib++;
@@ -2048,10 +2282,13 @@ static void hk_R_EmitQuakeFloorPolys(msurface_t* fa)
 	//float		scroll;
 	uint32_t	render_flags = 0;
 	DWORD		color = D3DCOLOR_ARGB( 255, 255, 255, 255 );
+	qboolean	undulate = rmx_noflooranim->value ? qfalse : qtrue;
 
 	//take color from previous calls to glColor
 	//if ( D3DState.CurrentState.isSet.bits.color )
 	color = D3DState.CurrentState.currentColor;
+
+	R_RenderSurfs(render_flags);
 
 	for (bp = fa->polys; bp != NULL; bp = bp->next)
 	{
@@ -2092,8 +2329,11 @@ static void hk_R_EmitQuakeFloorPolys(msurface_t* fa)
 			//glVertex3fv(v);
 			VectorCopy( v, vb->xyz );
 
-			vb->xyz[2] += r_turbsin[Q_ftol( ((v[0] * 2.3f + v[1]) * 0.015f + rdt * 3.0f) * TURBSCALE ) & 255] * (quake_amount->value * 0.05f) * 0.5f +
-				r_turbsin[Q_ftol( ((v[1] * 2.3f + v[0]) * 0.015f + rdt * 6.0f) * TURBSCALE ) & 255] * (quake_amount->value * 0.05f) * 0.25f;
+			if ( undulate )
+			{
+				vb->xyz[2] += r_turbsin[Q_ftol(((v[0] * 2.3f + v[1]) * 0.015f + rdt * 3.0f) * TURBSCALE) & 255] * (quake_amount->value * 0.05f) * 0.5f +
+					r_turbsin[Q_ftol(((v[1] * 2.3f + v[0]) * 0.015f + rdt * 6.0f) * TURBSCALE) & 255] * (quake_amount->value * 0.05f) * 0.25f;
+			}
 
 			vb++;
 			ib++;
@@ -2106,22 +2346,76 @@ static void hk_R_EmitQuakeFloorPolys(msurface_t* fa)
 	R_RenderSurfs( render_flags );
 }
 
+static std::map<std::string, int> g_compnormals_textures;
+static std::map<std::string, int> g_logtextures;
+
 void h2_refgl_frame_ended()
 {
 	if ( rmx_dyn_linger->modified )
 	{
 		rmx_dyn_linger->modified = qfalse;
-
 		qdx_lights_dynamic_linger( int(rmx_dyn_linger->value) );
 	}
 
 	if ( rmx_coronas->modified && !rmx_coronas->value )
 	{
+		rmx_coronas->modified = qfalse;
 		qdx_lights_clear( LIGHT_CORONA );
+	}
+
+	if (rmx_logtextures->value)
+	{
+		riCVAR_SET("rmx_logtextures", "0");
+
+		auto it = g_logtextures.begin();
+		while (it != g_logtextures.end())
+		{
+			riPRINTF(PRINT_ALL, "%s\n", it->first.c_str());
+			it++;
+		}
+		g_logtextures.clear();
 	}
 
 	glClearColor( 0, 0, 0, 0 );
 	//glClear( GL_COLOR_BUFFER_BIT );
+}
+
+static void h2_read_compnormals_textures()
+{
+	char fieldname[16];
+	char texname[128];
+	int i = 0;
+	while (1)
+	{
+		snprintf(fieldname, sizeof(fieldname), "texture%d", i);
+		int res = qdx_readmapconfstr("compnormals", fieldname, texname, sizeof(texname));
+		if (res == 0)
+			break;
+		g_compnormals_textures.emplace(texname, 1);
+		i++;
+	}
+	riPRINTF(PRINT_ALL, "ComputeNormals: found %d texturenames\n", i);
+}
+
+static bool h2_should_compute_normals(const image_t* image)
+{
+	bool ret = false;
+
+	if (rmx_logtextures->value)
+	{
+		if (g_logtextures.find(image->name) == g_logtextures.end())
+		{
+			g_logtextures[image->name] = 1;
+		}
+	}
+
+	auto it = g_compnormals_textures.find(image->name);
+	if (it != g_compnormals_textures.end())
+	{
+		ret = true;
+	}
+
+	return ret;
 }
 
 typedef struct ResMngr_Block_s
@@ -2202,6 +2496,7 @@ static void (*fp_calcnormals)( int param_1, float param_2, float param_3, int pa
 static void (*fp_IN_DeactivateMouse)();// = 0x1d240
 static byte** dp_sv_client;// = 0x7becc
 #define sv_client *(dp_sv_client)
+static void (*CLFX_LoadDll)(void);// = 0x33e80
 
 #define REFDEF_VIEWORG_OFF 7
 #define REFDEF_CLIENTVIEWORG_OFF 10
@@ -2224,7 +2519,7 @@ static void (*fp_free)(void*) = 0;
 
 typedef LONG (WINAPI *DetourAction_FP)(_Inout_ PVOID *ppPointer, _In_ PVOID pDetour);
 static void h2_detour_action( DetourAction_FP );
-static gameparam_t __cdecl h2_implement_api( gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2 );
+static gameparamret_t __cdecl h2_implement_api( gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2 );
 
 static void h2_generic_fixes()
 {
@@ -2299,6 +2594,11 @@ static void h2_generic_fixes()
 			{
 				memset( code, 0x90, 5 );
 				hook_protect( code, 5, restore );
+
+				//we are too late unfortunately since the call was already made
+				//however we can make the call again with the patched code
+				CLFX_LoadDll = (void(*)())((byte*)quake2_data.lpBaseOfDll + 0x33e80);
+				CLFX_LoadDll();
 
 				logPrintf( "h2_generic_fixes: CLFX_LoadDll was patched\n" );
 			}
@@ -2475,15 +2775,18 @@ static void hk_R_BeginRegistration( const char* model )
 {
 	HOOK_ONLINE_NOTICE();
 
-	static std::string mapname("");
-	if ( mapname.compare( model ) != 0 )
+	//we need to do this to recreate coronas on resolution change
+	//static std::string mapname("");
+	//if ( mapname.compare( model ) != 0 )
 	{
 		//do some cleaning
 		g_halosvalidation.clear();
 		qdx_begin_loading_map( model );
 
-		mapname.assign( model );
+		//mapname.assign( model );
 	}
+
+	h2_read_compnormals_textures();
 	
 	fp_R_BeginRegistration( model );
 }
@@ -2543,14 +2846,14 @@ typedef struct entity_s
 void AngleVectors( const vec3_t angles, vec3_t forward )
 {
 	float angle;
-	float sr, sp, sy, cr, cp, cy;
+	float sp, sy, cp, cy;
 
 	angle = angles[YAW] * float(M_PI * 2 / 360);
-	sy = sin( angle );
-	cy = cos( angle );
+	sy = sinf( angle );
+	cy = cosf( angle );
 	angle = angles[PITCH] * float(M_PI * 2 / 360);
-	sp = sin( angle );
-	cp = cos( angle );
+	sp = sinf( angle );
+	cp = cosf( angle );
 
 	if ( forward ) {
 		forward[0] = cp * cy;
@@ -2590,7 +2893,7 @@ static void hk_R_RenderView( int* refdef )
 			for ( int i = 0; i < numAlphaEntities; i++, alpha_entities++ )
 			{
 				model_t** model = (*alpha_entities)->model;
-				if ( 0 == strncmp( HALO_STR, (*model)->name, sizeof( HALO_STR ) -1 ) )
+				if ( model && *model && 0 == strncmp( HALO_STR, (*model)->name, sizeof( HALO_STR ) -1 ) )
 				{
 					paletteRGBA_t clrb = (*alpha_entities)->color;
 					uint32_t hash = fnv_32a_buf( &clrb, sizeof( clrb ), 42 );
@@ -2661,15 +2964,15 @@ static void hk_calcnormals( int param_1, float param_2, float param_3, int param
 	fp_calcnormals( param_1, param_2, param_3, param_4, param_5, param_6 );
 }
 
-static gameparam_t __cdecl h2_implement_api( gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2 )
+static gameparamret_t __cdecl h2_implement_api( gameops_t op, gameparam_t p0, gameparam_t p1, gameparam_t p2 )
 {
-	gameparam_t ret = { 0 };
+	gameparamret_t ret = { 0 };
 
 	switch ( op )
 	{
 	case OP_GETVAR: {
 		cvarq2_t* cv = riCVAR_GET(p0.strval, "0", 0 );
-		ret = int(cv->value);
+		ret.intval = int(cv->value);
 		break; }
 	case OP_SETVAR:
 		riCVAR_SET( p0.strval, p1.strval );
@@ -2683,8 +2986,11 @@ static gameparam_t __cdecl h2_implement_api( gameops_t op, gameparam_t p0, gamep
 	case OP_DEACTMOUSE:
 		fp_IN_DeactivateMouse();
 		break;
+	case OP_GETNORMALSTHRESHVAL:
+		ret.pfltval = &g_normals_angleval;
+		break;
 	default:
-		riPRINTF(PRINT_WARNING, "Unsupported OP:%d\n", op );
+		riPRINTF(PRINT_ALL, "Unsupported OP:%d\n", op );
 		break;
 	}
 
@@ -2804,3 +3110,5 @@ static void __cdecl hk_free( void* block )
 
 	fp_free( (byte*)p + sizeof( *p ) );
 }
+
+#endif

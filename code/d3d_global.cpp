@@ -102,6 +102,14 @@ void D3DGlobal_Init( D3DGlobal_t * D3DGlobalPtrLocal, bool clearGlobals )
 			D3DGlobal.defaultTexture[i] = new D3DTextureObject(0);
 	}
 
+	if (!g_iniavailable)
+	{
+		if (g_inifile.read(g_iniconf))
+		{
+			g_iniavailable = true;
+		}
+	}
+
 	if (!clearGlobals)
 		matrix_detect_configuration_reset();
 }
@@ -344,7 +352,11 @@ void* D3DGlobal_ReadGameConfPtr(const char* valname)
 	{
 		if (gamename && g_iniconf.has(gamename) && g_iniconf[gamename].has(valname))
 		{
-			ret = (void*)strtoul( g_iniconf[gamename][valname].c_str(), NULL, 16 );
+			ret = (void*)(
+					sizeof(void*) <= sizeof(unsigned long) ?
+						strtoul(g_iniconf[gamename][valname].c_str(), NULL, 16) :
+						_strtoui64(g_iniconf[gamename][valname].c_str(), NULL, 16)
+				);
 			break;
 		}
 		else
@@ -850,6 +862,7 @@ static bool D3DGlobal_SetupPresentParams( int width, int height, int bpp, BOOL w
 
 	D3DGlobal.hPresentParams.FullScreen_RefreshRateInHz = D3DGlobal.hCurrentMode.RefreshRate;
 	D3DGlobal.hPresentParams.Windowed = windowed;
+	D3DGlobal.hPresentParams.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
 
 	// request 1 backbuffer
 	D3DGlobal.hPresentParams.BackBufferCount = 1;
@@ -1070,6 +1083,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 	D3DGlobal.settings.game.remixapi = D3DGlobal_ReadGameConf( "remixapi" );
 	D3DGlobal.settings.game.orthovertexshader = D3DGlobal_ReadGameConf( "orthovertexshader" );
 	D3DGlobal.settings.game.orthoskipuntextureddraws = D3DGlobal_ReadGameConf( "orthoskipuntextureddraws" );
+	D3DGlobal.settings.game.depthOffDisablesWrites = D3DGlobal_ReadGameConf( "depthOffDisablesWrites" );
 
 	D3DGlobal.normalPtrGuessEnabled = 0;
 	{
@@ -1323,6 +1337,7 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 		do {
 			if ( resource_load_shader( RES_ID_ORTHO_VS, &data, &size, D3DGlobal.hModule ) )
 			{
+#if SHADERS_FROM_SOURCE
 				ID3DXBuffer* vertexShaderBuffer;
 
 				res = D3DXCompileShader( (LPCSTR)data, size, NULL, NULL, "main", "vs_2_0", 0, &vertexShaderBuffer, 0, &D3DGlobal.orthoShaders.constants );
@@ -1331,12 +1346,16 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 				res = D3DGlobal.pDevice->CreateVertexShader( (DWORD*)vertexShaderBuffer->GetBufferPointer(), &D3DGlobal.orthoShaders.vs );
 
 				vertexShaderBuffer->Release();
+#else
+				res = D3DGlobal.pDevice->CreateVertexShader((DWORD*)data, &D3DGlobal.orthoShaders.vs);
+#endif
 				if ( FAILED( res ) ) break;
 			}
 			else break;
 
 			if ( resource_load_shader( RES_ID_ORTHO_PS, &data, &size, D3DGlobal.hModule ) )
 			{
+#if SHADERS_FROM_SOURCE
 				ID3DXBuffer* pixelShaderBuffer;
 
 				res = D3DXCompileShader( (LPCSTR)data, size, NULL, NULL, "main", "ps_2_0", 0, &pixelShaderBuffer, 0, 0 );
@@ -1345,6 +1364,9 @@ OPENGL_API HGLRC WINAPI wrap_wglCreateContext( HDC hdc )
 				res = D3DGlobal.pDevice->CreatePixelShader( (DWORD*)pixelShaderBuffer->GetBufferPointer(), &D3DGlobal.orthoShaders.ps );
 
 				pixelShaderBuffer->Release();
+#else
+				res = D3DGlobal.pDevice->CreatePixelShader((DWORD*)data, &D3DGlobal.orthoShaders.ps);
+#endif
 				if ( FAILED( res ) ) break;
 			}
 			else break;
@@ -1580,15 +1602,13 @@ OPENGL_API BOOL WINAPI wrap_wglSwapBuffers( HDC )
 			}
 		}
 
-#ifndef QINDIEGLSRC_NO_REMIX
-		qdx_imgui_draw();
-#endif
-
 		D3DGlobal.pDevice->EndScene();
 		D3DGlobal.sceneBegan = false;
 
 #ifndef QINDIEGLSRC_NO_REMIX
+		qdx_imgui_draw();
 		qdx_lights_draw();
+		rmx_frame_end();
 #endif
 
 		HRESULT hr;
@@ -1823,23 +1843,45 @@ OPENGL_API int WINAPI wglGetSwapInterval()
 	return (D3DGlobal.vSync ? 1 : 0);
 }
 
-OPENGL_API void WINAPI glPNTrianglesiATI( GLenum pname, GLint param )
-{
-	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
-
-	static bool warningPrinted = false;
-	if (!warningPrinted) {
-		warningPrinted = true;
-		logPrintf("WARNING: glPNTrianglesiATI not supported\n");
-	}	
-}
 OPENGL_API void WINAPI glPNTrianglesfATI( GLenum pname, GLfloat param )
 {
 	_CRT_UNUSED( pname ); _CRT_UNUSED( param );
 
 	static bool warningPrinted = false;
+
 	if (!warningPrinted) {
 		warningPrinted = true;
 		logPrintf("WARNING: glPNTrianglesfATI not supported\n");
 	}	
+}
+
+void global_options_set(int id, void* data)
+{
+	enum
+	{
+		OPT_NORMALPTR,
+	};
+
+	const char* gamename = D3DGlobal_GetGameName();
+
+	switch (id)
+	{
+	case OPT_NORMALPTR:{
+		void** ptrs = (void**)data;
+		if (gamename)
+		{
+			char name[32]; char value[32];
+
+			snprintf(name, sizeof(name), "dp_VertexPointer%d", ARRAYSIZE(D3DGlobal.normalPtrGuess) - 1);
+			snprintf(value, sizeof(value), "%p", ptrs[0]);
+			g_iniconf[gamename][name].assign(value);
+
+			snprintf(name, sizeof(name), "dp_NormalPointer%d", ARRAYSIZE(D3DGlobal.normalPtrGuess) - 1);
+			snprintf(value, sizeof(value), "%p", ptrs[1]);
+			g_iniconf[gamename][name].assign(value);
+		}
+		if(D3DGlobal.normalPtrGuessEnabled == 1)
+			logPrintf("WARN: OPT_NORMALPTR was set after globals were initialised, it may not be considered");
+		break;}
+	}
 }

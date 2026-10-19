@@ -4,12 +4,15 @@
 #include "imgui.h"
 #include "backends/imgui_impl_dx9.h"
 #include "backends/imgui_impl_win32.h"
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include "d3d_wrapper.hpp"
 #include "d3d_global.hpp"
 #include "d3d_matrix_stack.hpp"
 #include "d3d_state.hpp"
 #include "d3d_helpers.hpp"
+#include "d3d_matrix_detection.hpp"
+//#include "camera_search.h"
 #include <string>
 
 #define GVAR_SHOW_IMGUI "rmx_show_imgui"
@@ -51,7 +54,7 @@ static void do_draw()
 {
 	static float f = 0.0f;
 	static int counter = 0;
-	static bool no_background = 0;
+	static bool no_background = 1;
 	static bool no_scrollbar = 1;
 	ImGuiWindowFlags flags = 0;
 	if ( no_background ) flags = flags | ImGuiWindowFlags_NoBackground;
@@ -124,15 +127,18 @@ static void do_draw()
 		ImGui::Text( "Radius = RADIUS + intensity * RADIUS_SCALE" );
 		ImGui::DragFloat( "RADIUS##1", qdx_4imgui_radius_dynamic_1f(), 0.1, 0, 10 );
 		ImGui::DragFloat( "RADIUS_SCALE##1", qdx_4imgui_radius_dynamic_scale_1f(), 0.0005, 0, 1 );
+		ImGui::DragFloat3("Cylinder Axis##1", qdx_4imgui_cylinder_axis_dynamic_3f(), 1.0, 0, 360);
+		ImGui::DragFloat("Cylinder Length##1", qdx_4imgui_cylinder_len_dynamic_1f(), 0.1, 0, 20);
 
+		bool clearcoronas = false;
 		ImGui::SeparatorText( "Corona Radiance:" );
-		if(ImGui::DragFloat( "BASE##2", qdx_4imgui_radiance_coronas_1f(), 10, 0, 50000 ))
+		if (ImGui::DragFloat("BASE##2", qdx_4imgui_radiance_coronas_1f(), 10, 0, 50000)) clearcoronas = true;
+		if (ImGui::DragFloat("RADIUS##2", qdx_4imgui_radius_coronas_1f(), 0.1, 0, 10)) clearcoronas = true;
+		if (ImGui::DragFloat3("Cylinder Axis##2", qdx_4imgui_cylinder_axis_coronas_3f(), 1.0, 0, 360)) clearcoronas = true;
+		if (ImGui::DragFloat("Cylinder Length##2", qdx_4imgui_cylinder_len_coronas_1f(), 0.1, 0, 20)) clearcoronas = true;
+		if (clearcoronas)
 		{
-			qdx_lights_clear( LIGHT_CORONA );
-		}
-		if(ImGui::DragFloat( "RADIUS##2", qdx_4imgui_radius_coronas_1f(), 0.1, 0, 10 ))
-		{
-			qdx_lights_clear( LIGHT_CORONA );
+			qdx_lights_clear(LIGHT_CORONA);
 		}
 
 		ImGui::NewLine();
@@ -268,7 +274,7 @@ static void do_draw()
 		bool updated = false;
 		if (ImGui::Checkbox("Enabled", &enabled)) updated = true;
 		if (ImGui::ColorEdit3("Color##20", rgb, ImGuiColorEditFlags_Float)) updated = true;
-		if (ImGui::DragFloat("Intensity", &scale, 0.02, 0, 5)) updated = true;
+		if (ImGui::DragFloat("Intensity", &scale, 0.005, 0, 5)) updated = true;
 		if (updated)
 		{
 			float multv = max(max(rgb[0], rgb[1]), rgb[2]);
@@ -279,8 +285,37 @@ static void do_draw()
 			cnv[2] = rgb[2] * multv;
 			rmx_distant_light_radiance(cnv[0], cnv[1], cnv[2], enabled);
 		}
-		ImGui::Text("Final %.3f %.3f %.3f", cnv[0], cnv[1], cnv[2]);
+		ImGui::Text("Remix Values: %.3f %.3f %.3f", cnv[0], cnv[1], cnv[2]);
+
+		static float dir[3] = { 0, 0, -1 };
+		if (ImGui::DragFloat3("Direction##20", dir, 0.005, -90.0, 90.0))
+		{
+			rmx_distant_light_direction(dir[0], dir[1], dir[2], enabled);
+		}
 	}
+
+#ifdef FRUSTUM_IMGUI
+	if (ImGui::CollapsingHeader("Frustum Tests"))
+	{
+		ImGui::Checkbox("Active##FRU", (bool*)qdx_4imgui_frustumoverride());
+		ImGui::SliderInt("Type##FRU", qdx_4imgui_frustumtype(), 0, 2);
+		ImGui::NewLine();
+
+		ImGui::SliderFloat3("Plane 0", qdx_4imgui_frustrumplane(0), -1, 1);
+		ImGui::SliderFloat("Dist 0", qdx_4imgui_frustumdist(0), -3000, 3000);
+
+		ImGui::SliderFloat3("Plane 1", qdx_4imgui_frustrumplane(1), -1, 1);
+		ImGui::SliderFloat("Dist 1", qdx_4imgui_frustumdist(1), -3000, 3000);
+
+		ImGui::NewLine();
+
+		ImGui::SliderFloat3("Plane 2", qdx_4imgui_frustrumplane(2), -1, 1);
+		ImGui::SliderFloat("Dist 2", qdx_4imgui_frustumdist(2), -3000, 3000);
+
+		ImGui::SliderFloat3("Plane 3", qdx_4imgui_frustrumplane(3), -1, 1);
+		ImGui::SliderFloat("Dist 3", qdx_4imgui_frustumdist(3), -3000, 3000);
+	}
+#endif
 
 #ifdef SURFACE_SEPARATION
 	if ( ImGui::CollapsingHeader( "Surface Separation" ) )
@@ -481,12 +516,121 @@ static void do_draw()
 		}
 	}
 #endif
+
+	matrix_detect_t* md = NULL;
+	matrix_detect_get_display(&md);
+	if (md)
+	{
+		if (ImGui::CollapsingHeader("Cameras"))
+		{
+			md->disp_enabled = true;
+
+			char headerText[128];
+			snprintf(headerText, sizeof(headerText), "DETECTION enable:%d mode:%d selection:%d(%d)", md->det_enabled, md->det_mode, md->addr_selected, md->addr_count);
+			ImGui::Text(headerText);
+
+			ImVec2 tableSize = ImVec2(125.0f, 0.0f);
+			if (ImGui::BeginTable("AddressTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit, tableSize)) {
+				ImGui::TableSetupColumn("Index");
+				ImGui::TableSetupColumn("Address");
+				ImGui::TableHeadersRow();
+
+				for (int i = 0; i < md->addr_count; ++i) {
+					ImGui::TableNextRow();
+
+					// Column 0: Index
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%d", i);
+
+					// Column 1: Hex Address
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%p", md->addrs[i]);
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::SliderFloat("Detect dist", &md->disp_threshold, 0, 500.f);
+
+			bool foundOne = false;
+			matrix_detect_t::mat_slot_s* slot = md->disp_slot;
+			for (int i = 0; i < MAT_DISP_NUMSLOTS; i++, slot++)
+			{
+				if (slot->count)
+				{
+					foundOne = true;
+
+					int key = i + 2240U;
+					ImGui::PushID(key);
+
+					// Display the key (e.g., texture ID or generated slot ID)
+					snprintf(headerText, sizeof(headerText), "Matrix ID: %d cnt(%d)", i, slot->count);
+					if (ImGui::CollapsingHeader(headerText, ImGuiTreeNodeFlags_DefaultOpen)) {
+
+						// 4-column table for the 4x4 matrix
+						if (ImGui::BeginTable("MatrixTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+
+							// Print row by row for readability.
+							// OpenGL matrices are column-major in memory:
+							// m[0..3] is column 0, m[4..7] is column 1, etc.
+							for (int row = 0; row < 4; ++row) {
+								ImGui::TableNextRow();
+								for (int col = 0; col < 4; ++col) {
+									ImGui::TableSetColumnIndex(col);
+
+									// Calculate index to fetch data row-by-row from column-major array
+									//int index = (col * 4) + row;
+									int index = (row * 4) + col;
+
+									// Highlight the translation vector (last column in row-major view)
+									if (row == 3 && col < 3) {
+										ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "%10.3f", slot->matrix[index]);
+									}
+									else {
+										ImGui::Text("%10.3f", slot->matrix[index]);
+									}
+								}
+							}
+							ImGui::EndTable();
+						}
+					}
+					ImGui::PopID();
+				}
+			}
+			md->disp_rejects = 0;
+			if (!foundOne)
+			{
+				ImGui::Text("No matrices detected.");
+			}
+		}
+		else
+		{
+			md->disp_enabled = false;
+		}
+	}
+
+	float* normals_thresh = rmx_4imgui_getnormalsthresh();
+	if (normals_thresh)
+	{
+		if (ImGui::CollapsingHeader("Normals Generation"))
+	{
+		ImGui::SliderFloat("Limit", normals_thresh, -1.0, 1.0);
+		ImGui::Text("Angle value %.3f", (180.0 / M_PI) * acosf(*normals_thresh));
+	}
+	}
 	
 	ImGui::NewLine(); ImVec2 toggle_sz( 150, 0 );
 	if ( ImGui::Button( "Toggle Flashlight", toggle_sz ) )
 	{
 		rmx_flashlight_enable();
 	}
+
+
+	//ImGui::NewLine();
+	//if (ImGui::Button("Scan 4 Camera", toggle_sz))
+	//{
+	//	camera_search_start();
+	//}
+
 #ifdef DEBUG_HELPERS
 	/*==========================
 	* Togglers
@@ -690,14 +834,17 @@ void qdx_imgui_draw()
 
 		do_draw();
 
-		if ( D3DGlobal.sceneBegan )
+		if (!D3DGlobal.sceneBegan)
 		{
-			ImGui::Render();
-			ImGui_ImplDX9_RenderDrawData( ImGui::GetDrawData() );
+			D3DGlobal.pDevice->BeginScene();
 		}
-		else
+
+		ImGui::Render();
+		ImGui_ImplDX9_RenderDrawData( ImGui::GetDrawData() );
+
+		if (!D3DGlobal.sceneBegan)
 		{
-			rmx_console_printf( PRINT_ERROR, "Scene did not begin!\n" );
+			D3DGlobal.pDevice->EndScene();
 		}
 
 		if ( zen_val != FALSE )
@@ -746,7 +893,7 @@ static LRESULT CALLBACK wnd_proc_hk(HWND hWnd, UINT message_type, WPARAM wParam,
 	default: break; 
 	}
 
-	BOOL imgui_consumed = ImGui_ImplWin32_WndProcHandler( hWnd, message_type, wParam, lParam );
+	BOOL imgui_consumed = (BOOL)ImGui_ImplWin32_WndProcHandler( hWnd, message_type, wParam, lParam );
 
 	static bool mouse0down = false;
 	if ( !imgui_consumed )
@@ -778,7 +925,7 @@ static LRESULT CALLBACK wnd_proc_hk(HWND hWnd, UINT message_type, WPARAM wParam,
 
 		if ( pass_msg_to_game || ( !imgui_consumed && !io->WantCaptureMouse && !io->WantCaptureKeyboard) )
 		{
-			return g_game_wndproc( hWnd, message_type, wParam, lParam );
+			return CallWindowProc( g_game_wndproc, hWnd, message_type, wParam, lParam );
 		}
 	}
 
@@ -794,16 +941,24 @@ static void exchange_wndproc_and_mouse( enum exc_wprocnmouse_e action )
 		g_game_wndproc = (WNDPROC)(SetWindowLongPtr(HWND(g_hwnd), GWLP_WNDPROC, LONG_PTR(wnd_proc_hk)));
 		g_in_mouse_val = rmx_gamevar_get("in_mouse");
 		if ( g_in_mouse_val )
+		{
 			rmx_gamevar_set( "in_mouse", "0" );
+			rmx_gamevar_get( "in_mouse" ); //cvar is latched, but will update on cvar-get
+		}
 		rmx_deactivate_mouse();
 		break;
-	case WNDPROC_RESTORE_GAME:
+	case WNDPROC_RESTORE_GAME:{
 		if( g_game_wndproc )
 			SetWindowLongPtr( HWND( g_hwnd ), GWLP_WNDPROC, LONG_PTR( g_game_wndproc ) );
 		g_game_wndproc = NULL;
 		if( g_in_mouse_val )
-			rmx_gamevar_set( "in_mouse", "1" );
+		{
+			char value[4] = { 0 };
+			snprintf(value, sizeof(value), "%d", g_in_mouse_val);
+			rmx_gamevar_set( "in_mouse", value );
+			rmx_gamevar_get( "in_mouse" ); //cvar is latched, but will update on cvar-get
+		}
 		g_in_mouse_val = 0;
-		break;
+		break;}
 	}
 }

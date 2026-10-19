@@ -32,6 +32,13 @@
 // Log all internal errors into text file.
 // This will help to debug the wrapper and monitor unimplemented functions.
 //==================================================================================
+
+// Define 10 MB in bytes
+#define MAX_LOG_SIZE (10 * 1024 * 1024) 
+
+// Helper function to get the current file size
+static long get_file_size(const char* filename);
+
 static FILE *g_fpLog = nullptr;
 static char *log_string = nullptr;
 static const size_t c_LogStringSize = 8192; //8 kbytes
@@ -105,6 +112,25 @@ void logPrintf( const char *fmt, ... )
 	fflush(g_fpLog);
 }
 
+// Helper function to get the current file size
+static long get_file_size(const char* filename) {
+	FILE* fp = fopen(filename, "r");
+	if (fp == NULL) {
+		// File doesn't exist yet, or we don't have permission to read it.
+		// Returning 0 ensures we will create it using append mode later.
+		return 0;
+	}
+
+	// Jump to the end of the file
+	fseek(fp, 0, SEEK_END);
+
+	// Get the current byte offset (which equals the file size)
+	long size = ftell(fp);
+
+	fclose(fp);
+	return size;
+}
+
 #define PATH_SZ 1024
 static TCHAR exename[PATH_SZ] = { 0 };
 static TCHAR dllname[PATH_SZ] = { 0 };
@@ -147,7 +173,7 @@ BOOL APIENTRY DllMain( HMODULE hModule, DWORD ul_reason_for_call, LPVOID )
 					TCHAR* name = _tcsrchr(exename, _T('\\'));
 					if (name) {
 						name++;
-						int count = _tclen( name );
+						size_t count = _tclen( name );
 						TCHAR* tmp = _tcsrchr(exename, _T('.'));
 						if (tmp) {
 							count = tmp - name;
