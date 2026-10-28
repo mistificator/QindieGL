@@ -41,11 +41,13 @@
 
 #define OPENGL_API
 
-#define WRAPPER_GL_VENDOR_STRING			"Crystice Softworks (Microsoft Direct3D 9.0c)"
-#define WRAPPER_GL_VERSION_STRING			"1.1"
-#define WRAPPER_GL_SHORT_NAME_STRING		"QindieGL"
-#define WRAPPER_GL_WRAPPER_NAME_STRING		"QindieGL by Crystice Softworks"
-#define WRAPPER_GL_WRAPPER_VERSION_STRING	"1.0"
+#include "resource.h"
+
+#define WRAPPER_GL_SHORT_NAME_STRING      "QindieGL"
+#define WRAPPER_GL_WRAPPER_NAME_STRING    "QindieGL (Direct3D 9.0c)"
+#define WRAPPER_GL_VENDOR_STRING          "Crystice Softworks"
+#define WRAPPER_GL_VERSION_STRING         "1.4.0"
+#define WRAPPER_GL_WRAPPER_VERSION_STRING VER_VERSION_STR " (build " __DATE__ ")"
 
 #define WRAPPER_REGISTRY_PATH				"SOFTWARE\\Crystice Softworks\\QindieGL"
 #define WRAPPER_REGISTRY_CFG_EXT			"Config"

@@ -55,7 +55,22 @@ static BOOL D3DGlobal_InitializeDirect3D( void );
 
 void D3DGlobal_Init( bool clearGlobals )
 {
-	logPrintf("--- Init( %s ) ---\n", clearGlobals ? "clear globals" : "normal" );
+    if (clearGlobals) {
+        // Log wrapper version, target architecture, and emulated OpenGL version on startup
+        logPrintf(
+            "%s v%s [%s %s] (OpenGL %s)\n",
+            WRAPPER_GL_WRAPPER_NAME_STRING,
+            WRAPPER_GL_WRAPPER_VERSION_STRING,
+            (sizeof(void*) == 8 ? "x64" : "x86"),
+#ifdef _DEBUG
+            "Debug",
+#else
+            "Release",
+#endif
+            WRAPPER_GL_VERSION_STRING
+            );
+    }
+    logPrintf("--- Init( %s ) ---\n", clearGlobals ? "clear globals" : "normal" );
 
 	if (clearGlobals) {
 		memset( &D3DGlobal, 0, sizeof(D3DGlobal) );

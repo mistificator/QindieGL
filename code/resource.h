@@ -10,8 +10,25 @@
 #define RES_TYPE_SHADER_INCLUDE  261
 #define RES_TYPE_PIC_DDS  262
 
-#define VER_VERSION             1,1,7,3
-#define VER_VERSION_STR         "1.1.7.3\0"
+// Version components injected by CMake (with fallback defaults for legacy MSVS builds)
+#ifndef QINDIEGL_VERSION_MAJOR
+#define QINDIEGL_VERSION_MAJOR 1
+#endif
+#ifndef QINDIEGL_VERSION_MINOR
+#define QINDIEGL_VERSION_MINOR 0
+#endif
+#ifndef QINDIEGL_VERSION_PATCH
+#define QINDIEGL_VERSION_PATCH 0
+#endif
+#ifndef QINDIEGL_VERSION_TWEAK
+#define QINDIEGL_VERSION_TWEAK 0
+#endif
+
+#define QINDIEGL_VER_STR_EXP(a, b, c, d) #a "." #b "." #c "." #d
+#define QINDIEGL_VER_STR(a, b, c, d)     QINDIEGL_VER_STR_EXP(a, b, c, d)
+
+#define VER_VERSION     QINDIEGL_VERSION_MAJOR,QINDIEGL_VERSION_MINOR,QINDIEGL_VERSION_PATCH,QINDIEGL_VERSION_TWEAK
+#define VER_VERSION_STR QINDIEGL_VER_STR(QINDIEGL_VERSION_MAJOR, QINDIEGL_VERSION_MINOR, QINDIEGL_VERSION_PATCH, QINDIEGL_VERSION_TWEAK)
 
 // Next default values for new objects
 // 
