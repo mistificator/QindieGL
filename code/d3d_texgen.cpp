@@ -23,6 +23,7 @@
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
 #include "d3d_matrix_stack.hpp"
+#include "d3d_lists.hpp"
 #include <immintrin.h>
 
 //==================================================================================
@@ -304,26 +305,32 @@ static void GetTexGen( int stage, int coord, GLenum pname, T *params )
 
 OPENGL_API void WINAPI glTexGenf( GLenum coord,  GLenum pname,  GLfloat param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexGenf( coord, pname, param ) );
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGend( GLenum coord,  GLenum pname,  GLdouble param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexGend( coord, pname, param ) );
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGeni( GLenum coord,  GLenum pname,  GLint param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexGeni( coord, pname, param ) );
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, &param );
 }
 OPENGL_API void WINAPI glTexGenfv( GLenum coord,  GLenum pname,  const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexGenfv( coord, pname, params ) );
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glTexGendv( GLenum coord,  GLenum pname,  const GLdouble *params )
 {
-	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
+    D3DLISTS_RECORD( D3DLists_RecordTexGendv( coord, pname, params ) );
+    SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glTexGeniv( GLenum coord,  GLenum pname,  const GLint *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexGeniv( coord, pname, params ) );
 	SetupTexGen( D3DState.TextureState.currentTMU, coord - GL_S, pname, params );
 }
 OPENGL_API void WINAPI glGetTexGenfv( GLenum coord,  GLenum pname,  GLfloat *params )

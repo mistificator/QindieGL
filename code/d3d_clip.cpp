@@ -23,6 +23,7 @@
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
 #include "d3d_matrix_stack.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // User-defined clip planes
@@ -32,6 +33,7 @@
 
 OPENGL_API void WINAPI glClipPlane( GLenum plane,  const GLdouble *equation )
 {
+    D3DLISTS_RECORD( D3DLists_RecordClipPlane( plane, equation ) );
 	int planeIndex = plane - GL_CLIP_PLANE0;
 	if (planeIndex < 0 || planeIndex >= IMPL_MAX_CLIP_PLANES) {
 		D3DGlobal.lastError = E_INVALIDARG;

@@ -23,6 +23,7 @@
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
 #include "d3d_matrix_stack.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Light operations
@@ -101,6 +102,7 @@ OPENGL_API void WINAPI glGetLightiv( GLenum light, GLenum pname, GLint *params )
 
 OPENGL_API void WINAPI glLightModelf( GLenum pname, GLfloat param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordLightModelf( pname, param ) );
 	switch( pname ) {
 	case GL_LIGHT_MODEL_LOCAL_VIEWER:
 		D3DState.LightingState.lightModelLocalViewer =( param > 0 ) ? TRUE : FALSE;
@@ -117,6 +119,7 @@ OPENGL_API void WINAPI glLightModelf( GLenum pname, GLfloat param )
 }
 OPENGL_API void WINAPI glLightModelfv( GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordLightModelfv( pname, params ) );
 	switch( pname ) {
 	case GL_LIGHT_MODEL_AMBIENT:
 		D3DState.LightingState.lightModelAmbient = D3DCOLOR_ARGB( QINDIEGL_CLAMP( params[3] * 255.0f ),
@@ -146,6 +149,7 @@ OPENGL_API void WINAPI glLightModeliv( GLenum pname, const GLint *params )
 }
 OPENGL_API void WINAPI glLightf( GLenum light, GLenum pname, GLfloat param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordLightf( light, pname, param ) );
 	int lightIndex = light - GL_LIGHT0;
 	if( lightIndex < 0 || lightIndex >= IMPL_MAX_LIGHTS ) {
 		logPrintf( "WARNING: glLightf - bad light index %i\n", lightIndex );
@@ -177,6 +181,7 @@ OPENGL_API void WINAPI glLightf( GLenum light, GLenum pname, GLfloat param )
 }
 OPENGL_API void WINAPI glLightfv( GLenum light, GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordLightfv( light, pname, params ) );
 	int lightIndex = light - GL_LIGHT0;
 	if( lightIndex < 0 || lightIndex >= IMPL_MAX_LIGHTS ) {
 		logPrintf( "WARNING: glLightfv - bad light index %i\n", lightIndex );

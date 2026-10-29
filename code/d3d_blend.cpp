@@ -22,6 +22,7 @@
 #include "d3d_global.hpp"
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Blending states
@@ -32,6 +33,7 @@
 
 OPENGL_API void WINAPI glAlphaFunc( GLenum func, GLclampf ref )
 {
+    D3DLISTS_RECORD( D3DLists_RecordAlphaFunc( func, ref ) );
 	DWORD dfunc = UTIL_GLtoD3DCmpFunc(func);
 	if (dfunc != D3DState.ColorBufferState.alphaTestFunc) {
 		D3DState.ColorBufferState.alphaTestFunc = dfunc;
@@ -47,6 +49,7 @@ OPENGL_API void WINAPI glAlphaFunc( GLenum func, GLclampf ref )
 
 OPENGL_API void WINAPI glBlendFunc( GLenum sfactor, GLenum dfactor )
 {
+    D3DLISTS_RECORD( D3DLists_RecordBlendFunc( sfactor, dfactor ) );
 	if (D3DState.ColorBufferState.glBlendSrc != sfactor) {
 		D3DState.ColorBufferState.glBlendSrc = sfactor;
 		DWORD sfunc = UTIL_GLtoD3DBlendFunc(sfactor);
@@ -84,6 +87,8 @@ OPENGL_API void WINAPI glBlendFunc( GLenum sfactor, GLenum dfactor )
 
 OPENGL_API void WINAPI glBlendColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha )
 {
+    D3DLISTS_RECORD( D3DLists_RecordBlendColor( red, green, blue, alpha ) );
+
 	DWORD da = (DWORD)(alpha * 255);
 	DWORD dr = (DWORD)(red * 255);
 	DWORD dg = (DWORD)(green * 255);
@@ -103,6 +108,7 @@ OPENGL_API void WINAPI glBlendColor( GLclampf red, GLclampf green, GLclampf blue
 
 OPENGL_API void WINAPI glBlendEquation( GLenum mode )
 {
+    D3DLISTS_RECORD( D3DLists_RecordBlendEquation( mode ) );
 	DWORD func = UTIL_GLtoD3DBlendOp(mode);
 	if (D3DState.ColorBufferState.alphaBlendOp != func) {
 		D3DState.ColorBufferState.alphaBlendOp = func;
@@ -117,6 +123,7 @@ OPENGL_API void WINAPI glLogicOp( GLenum )
 
 OPENGL_API void WINAPI glFogfv( GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordFogfv( pname, params ) );
 	switch (pname) {
 	case GL_FOG_MODE:
 		switch ((GLenum)params[0]) {

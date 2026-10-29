@@ -22,6 +22,7 @@
 #include "d3d_global.hpp"
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Materials
@@ -31,6 +32,8 @@
 
 OPENGL_API void WINAPI glColorMaterial( GLenum face, GLenum mode )
 {
+    D3DLISTS_RECORD( D3DLists_RecordColorMaterial( face, mode ) );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -48,6 +51,8 @@ OPENGL_API void WINAPI glColorMaterial( GLenum face, GLenum mode )
 
 OPENGL_API void WINAPI glMaterialf( GLenum face, GLenum pname, GLfloat param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordMaterialf( face, pname, param ) );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {
@@ -75,6 +80,8 @@ OPENGL_API void WINAPI glMateriali( GLenum face, GLenum pname, GLint param )
 
 OPENGL_API void WINAPI glMaterialfv( GLenum face, GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordMaterialfv( face, pname, params ) );
+
 	static bool warningPrinted = false;
 
 	if( face != GL_FRONT_AND_BACK ) {

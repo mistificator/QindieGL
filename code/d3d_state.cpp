@@ -26,6 +26,7 @@
 #include "d3d_matrix_stack.hpp"
 #include "d3d_combiners.hpp"
 #include "d3d_matrix_detection.hpp"
+#include "d3d_lists.hpp"
 #include <map>
 
 D3DState_t D3DState;
@@ -1020,6 +1021,10 @@ void D3DState_SetDefaults()
 
 OPENGL_API void WINAPI glPushAttrib( GLbitfield mask )
 {
+    D3DLISTS_RECORD( D3DLists_RecordPushAttrib( mask ) );
+    if (mask & GL_LIST_BIT) {
+        D3DLists_PushAttrib();
+    }
 	D3DStateCopyMask = mask;
 	D3DState_Copy( &D3DState, &D3DStateCopy, mask );
 }
@@ -1032,10 +1037,16 @@ OPENGL_API void WINAPI glPushClientAttrib( GLbitfield mask )
 
 OPENGL_API void WINAPI glPopAttrib()
 {
+    D3DLISTS_RECORD( D3DLists_RecordPopAttrib() );
+
 	if (!D3DStateCopyMask) {
 		D3DGlobal.lastError = E_STACK_UNDERFLOW;
 		return;
 	}
+
+    if (D3DStateCopyMask & GL_LIST_BIT) {
+        D3DLists_PopAttrib();
+    }
 
 	D3DState_Copy( &D3DStateCopy, &D3DState, D3DStateCopyMask );
 
@@ -1468,11 +1479,13 @@ static void D3DState_EnableDisableClientState( GLenum cap, DWORD value )
 
 OPENGL_API void WINAPI glEnable( GLenum cap )
 {
+    D3DLISTS_RECORD( D3DLists_RecordEnable( cap ) );
 	D3DState_EnableDisableState( cap, TRUE );
 }
 
 OPENGL_API void WINAPI glDisable( GLenum cap )
 {
+    D3DLISTS_RECORD( D3DLists_RecordDisable( cap ) );
 	D3DState_EnableDisableState( cap, FALSE );
 }
 
@@ -1493,6 +1506,7 @@ OPENGL_API void WINAPI glDisableClientState( GLenum cap )
 
 OPENGL_API void WINAPI glHint(GLenum target,  GLenum mode)
 {
+    D3DLISTS_RECORD( D3DLists_RecordHint( target, mode ) );
 	switch( target )
 	{ 
 	case GL_PERSPECTIVE_CORRECTION_HINT:

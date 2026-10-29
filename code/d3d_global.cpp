@@ -30,6 +30,7 @@
 #include "d3d_matrix_stack.hpp"
 #include "d3d_matrix_detection.hpp"
 #include "d3d_helpers.hpp"
+#include "d3d_lists.hpp"
 #include "hooking.h"
 #include "rmx_gen.h"
 #include "rmx_light.h"
@@ -105,6 +106,8 @@ void D3DGlobal_Init( bool clearGlobals )
 
 	if (!clearGlobals)
 		matrix_detect_configuration_reset();
+
+    D3DLists_Init();
 }
 
 void D3DGlobal_Reset()
@@ -222,6 +225,7 @@ void D3DGlobal_Cleanup( bool cleanupAll )
 			D3DGlobal.textureMatrixStack[i] = nullptr;
 		}
 	}
+    D3DLists_Cleanup();
 	if (D3DGlobal.pObjectBuffer) {
 		delete D3DGlobal.pObjectBuffer;
 		D3DGlobal.pObjectBuffer = nullptr;

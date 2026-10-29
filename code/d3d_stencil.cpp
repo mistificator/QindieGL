@@ -22,6 +22,7 @@
 #include "d3d_global.hpp"
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Stencil buffer functions
@@ -33,6 +34,7 @@
 
 OPENGL_API void WINAPI glStencilMask( GLuint mask )
 {
+    D3DLISTS_RECORD( D3DLists_RecordStencilMask( mask ) );
 	if (D3DState.StencilBufferState.stencilWriteMask != mask) {
 		D3DState.StencilBufferState.stencilWriteMask = mask;
 		D3DState_SetRenderState( D3DRS_STENCILWRITEMASK, mask );
@@ -41,6 +43,7 @@ OPENGL_API void WINAPI glStencilMask( GLuint mask )
 
 OPENGL_API void WINAPI glStencilFunc( GLenum func, GLint ref, GLuint mask )
 {
+    D3DLISTS_RECORD( D3DLists_RecordStencilFunc( func, ref, mask ) );
 	DWORD dfunc = UTIL_GLtoD3DCmpFunc(func);
 	if (!D3DState.EnableState.twoSideStencilEnabled || D3DState.StencilBufferState.activeStencilFace == GL_CW) {
 		if (dfunc != D3DState.StencilBufferState.stencilTestFunc) {
@@ -67,6 +70,7 @@ OPENGL_API void WINAPI glStencilFunc( GLenum func, GLint ref, GLuint mask )
 
 OPENGL_API void WINAPI glStencilOp( GLenum fail, GLenum zfail, GLenum zpass )
 {
+    D3DLISTS_RECORD( D3DLists_RecordStencilOp( fail, zfail, zpass ) );
 	DWORD dfunc;
 	if (!D3DState.EnableState.twoSideStencilEnabled || D3DState.StencilBufferState.activeStencilFace == GL_CW) {
 		dfunc = UTIL_GLtoD3DStencilFunc(fail);
@@ -105,6 +109,7 @@ OPENGL_API void WINAPI glStencilOp( GLenum fail, GLenum zfail, GLenum zpass )
 
 OPENGL_API void WINAPI glActiveStencilFace( GLenum face )
 {
+    D3DLISTS_RECORD( D3DLists_RecordActiveStencilFace( face ) );
 	if (face == GL_FRONT)
 		D3DState.StencilBufferState.activeStencilFace = (D3DState.PolygonState.frontFace == GL_CW) ? GL_CW : GL_CCW;
 	else

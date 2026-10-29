@@ -23,6 +23,7 @@
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
 #include "d3d_pixels.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Pixel operations
@@ -1615,6 +1616,7 @@ OPENGL_API void WINAPI glPixelStoref( GLenum pname, GLfloat param )
 
 OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordPixelTransferi( pname, param ) );
 	switch(pname) {
 	case GL_MAP_COLOR:
 		D3DState.ClientPixelStoreState.transferMapColor =(param > 0) ? GL_TRUE : GL_FALSE;
@@ -1660,6 +1662,7 @@ OPENGL_API void WINAPI glPixelTransferi( GLenum pname, GLint param )
 }
 OPENGL_API void WINAPI glPixelTransferf( GLenum pname, GLfloat param )
 {
+    D3DLISTS_RECORD( D3DLists_RecordPixelTransferf( pname, param ) );
 	switch(pname) {
 	case GL_MAP_COLOR:
 		D3DState.ClientPixelStoreState.transferMapColor =(param > 0) ? GL_TRUE : GL_FALSE;

@@ -26,6 +26,7 @@
 #include "d3d_array.hpp"
 #include "d3d_matrix_stack.hpp"
 #include "d3d_helpers.hpp"
+#include "d3d_lists.hpp"
 
 #include <vector>
 
@@ -151,6 +152,46 @@ static void D3DVA_CopyArrayToUBytes( const D3DVAInfo *pVAInfo, int index, GLubyt
 		D3DVA_CopyArrayToUBytesInternalUByte(pVAInfo, index, out);
 		break;
 	}
+}
+
+static void D3DVA_RecordArrayElement( GLint i )
+{
+    if ( !( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_VERTEX_BIT ) )
+        return;
+    if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_NORMAL_BIT ) {
+        GLfloat norm[3];
+        D3DVA_CopyArrayToFloats( &D3DState.ClientVertexArrayState.normalInfo, i, norm );
+        D3DLists_RecordNormal( norm[0], norm[1], norm[2] );
+    }
+    if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_COLOR_BIT ) {
+        GLubyte color[4] = { 255, 255, 255, 255 };
+        D3DVA_CopyArrayToUBytes( &D3DState.ClientVertexArrayState.colorInfo, i, color );
+        D3DLists_RecordColor( D3DCOLOR_ARGB( color[3], color[0], color[1], color[2] ) );
+    }
+    if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_COLOR2_BIT ) {
+        GLubyte color[4] = { 0, 0, 0, 0 };
+        D3DVA_CopyArrayToUBytes( &D3DState.ClientVertexArrayState.color2Info, i, color );
+        D3DLists_RecordColor2( ( color[0] << 16 ) | ( color[1] << 8 ) | color[2] );
+    }
+    if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_FOG_BIT ) {
+        GLfloat fogCoord = 0.0f;
+        D3DVA_CopyArrayToFloats( &D3DState.ClientVertexArrayState.fogInfo, i, &fogCoord );
+        D3DLists_RecordFogCoord( fogCoord );
+    }
+    for ( int j = 0; j < D3DGlobal.maxActiveTMU; ++j ) {
+        DWORD vaTextureBit = 1 << ( VA_TEXTURE_BIT_SHIFT + j );
+        if ( D3DState.ClientVertexArrayState.vertexArrayEnable & vaTextureBit ) {
+            GLfloat tc[4] = { 0, 0, 0, 1 };
+            D3DVA_CopyArrayToFloats( &D3DState.ClientVertexArrayState.texCoordInfo[j], i, tc );
+            D3DLists_RecordTexCoord( GL_TEXTURE0_ARB + j, tc[0], tc[1], tc[2], tc[3], D3DState.ClientVertexArrayState.texCoordInfo[j].elementCount );
+        }
+    }
+    GLfloat vertex[4] = { 0, 0, 0, 1 };
+    D3DVA_CopyArrayToFloats( &D3DState.ClientVertexArrayState.vertexInfo, i, vertex );
+    if ( D3DState.ClientVertexArrayState.vertexInfo.elementCount == 4 )
+        D3DLists_RecordVertex4( vertex[0], vertex[1], vertex[2], vertex[3] );
+    else
+        D3DLists_RecordVertex3( vertex[0], vertex[1], vertex[2] );
 }
 
 //---------------------------------------------------
@@ -1453,6 +1494,7 @@ OPENGL_API void WINAPI glArrayElement( GLint i )
 	assert( D3DGlobal.pIMBuffer != nullptr );
 
 	Consider_Active_VBO();
+    D3DLISTS_RECORD( D3DVA_RecordArrayElement( i ) );
 	if (!(D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_VERTEX_BIT)) {
 		logPrintf("WARNING: glArrayElement: vertex array is disabled\n");
 		return;
@@ -1501,6 +1543,16 @@ OPENGL_API void WINAPI glArrayElement( GLint i )
 
 static void internal_DrawArrays( GLenum mode, GLint first, GLsizei count )
 {
+    if ( D3DLists_IsCompiling() ) {
+        D3DLists_RecordBegin( mode );
+        for ( int i = 0; i < count; ++i )
+            D3DVA_RecordArrayElement( first + i );
+        D3DLists_RecordEnd();
+        if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_COLOR_BIT )
+            D3DLists_RecordColor( 0xFFFFFFFF );
+        if ( !D3DLists_IsExecuteMode() )
+            return;
+    }
 #if defined(VA_USE_IMMEDIATE_MODE)
 	assert( D3DGlobal.pIMBuffer != nullptr );
 	D3DGlobal.pIMBuffer->Begin( mode );
@@ -1537,6 +1589,25 @@ static void internal_DrawArrays( GLenum mode, GLint first, GLsizei count )
 }
 static void internal_DrawElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type,  const GLvoid *indices )
 {
+    if ( D3DLists_IsCompiling() ) {
+        D3DLists_RecordBegin( mode );
+        switch ( type ) {
+        case GL_UNSIGNED_BYTE:
+            for ( int i = 0; i < count; ++i ) D3DVA_RecordArrayElement( reinterpret_cast<const GLubyte*>( indices )[i] );
+            break;
+        case GL_UNSIGNED_SHORT:
+            for ( int i = 0; i < count; ++i ) D3DVA_RecordArrayElement( reinterpret_cast<const GLushort*>( indices )[i] );
+            break;
+        case GL_UNSIGNED_INT:
+            for ( int i = 0; i < count; ++i ) D3DVA_RecordArrayElement( reinterpret_cast<const GLuint*>( indices )[i] );
+            break;
+        }
+        D3DLists_RecordEnd();
+        if ( D3DState.ClientVertexArrayState.vertexArrayEnable & VA_ENABLE_COLOR_BIT )
+            D3DLists_RecordColor( 0xFFFFFFFF );
+        if ( !D3DLists_IsExecuteMode() )
+            return;
+    }
 #if defined(VA_USE_IMMEDIATE_MODE)
 	assert( D3DGlobal.pIMBuffer != nullptr );
 	D3DGlobal.pIMBuffer->Begin( mode );
@@ -1639,41 +1710,51 @@ static void internal_DrawElements( GLenum mode, GLuint start, GLuint end, GLsize
 OPENGL_API void WINAPI glDrawArrays( GLenum mode, GLint first, GLsizei count )
 {
 	Consider_Active_VBO();
-	D3DState_Check();
-	D3DState_AssureBeginScene();
+    if (!D3DLists_IsCompiling() || D3DLists_IsExecuteMode()) {
+        D3DState_Check();
+        D3DState_AssureBeginScene();
+    }
 	internal_DrawArrays( mode, first, count );
 }
 OPENGL_API void WINAPI glDrawElements( GLenum mode, GLsizei count, GLenum type, const GLvoid *indices )
 {
 	Consider_Active_VBO();
-	D3DState_Check();
-	D3DState_AssureBeginScene();
-	internal_DrawElements( mode, ~0u, 0, count, type, indices );
+    if (!D3DLists_IsCompiling() || D3DLists_IsExecuteMode()) {
+        D3DState_Check();
+        D3DState_AssureBeginScene();
+    }
+    internal_DrawElements( mode, ~0u, 0, count, type, indices );
 }
 
 OPENGL_API void WINAPI glDrawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices )
 {
 	Consider_Active_VBO();
-	D3DState_Check();
-	D3DState_AssureBeginScene();
-	internal_DrawElements( mode, start, end, count, type, indices );
+    if (!D3DLists_IsCompiling() || D3DLists_IsExecuteMode()) {
+        D3DState_Check();
+        D3DState_AssureBeginScene();
+    }
+    internal_DrawElements( mode, start, end, count, type, indices );
 }
 
 OPENGL_API void WINAPI glMultiDrawArrays( GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount )
 {
 	Consider_Active_VBO();
-	D3DState_Check();
-	D3DState_AssureBeginScene();
-	for (int i = 0; i < primcount; ++i)
+    if (!D3DLists_IsCompiling() || D3DLists_IsExecuteMode()) {
+        D3DState_Check();
+        D3DState_AssureBeginScene();
+    }
+    for (int i = 0; i < primcount; ++i)
 		if (count[i] > 0) internal_DrawArrays( mode, first[i], count[i] );
 }
 
 OPENGL_API void WINAPI glMultiDrawElements( GLenum mode, GLsizei *count, GLenum type, const GLvoid **indices, GLsizei primcount )
 {
 	Consider_Active_VBO();
-	D3DState_Check();
-	D3DState_AssureBeginScene();
-	for (int i = 0; i < primcount; ++i)
+    if (!D3DLists_IsCompiling() || D3DLists_IsExecuteMode()) {
+        D3DState_Check();
+        D3DState_AssureBeginScene();
+    }
+    for (int i = 0; i < primcount; ++i)
 		if (count[i] > 0) internal_DrawElements( mode, ~0u, 0, count[i], type, indices[i] );
 }
 

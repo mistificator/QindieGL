@@ -25,6 +25,7 @@
 #include "d3d_object.hpp"
 #include "d3d_texture.hpp"
 #include "d3d_pixels.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // Texturing
@@ -1097,6 +1098,8 @@ OPENGL_API void WINAPI glPrioritizeTextures( GLsizei n, const GLuint *textures, 
 		return;
 	}
 
+    D3DLISTS_RECORD( D3DLists_RecordPrioritizeTextures( n, textures, priorities ) );
+
 	assert(D3DGlobal.pObjectBuffer != nullptr);
 	for (int i = 0; i < n; ++i) {
 		if (textures[i] <= 0) continue;
@@ -1110,6 +1113,7 @@ OPENGL_API void WINAPI glPrioritizeTextures( GLsizei n, const GLuint *textures, 
 }
 OPENGL_API void WINAPI glBindTexture( GLenum target, GLuint texture )
 {
+    D3DLISTS_RECORD( D3DLists_RecordBindTexture( target, texture ) );
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
 		D3DGlobal.lastError = E_INVALIDARG;
@@ -1276,6 +1280,7 @@ OPENGL_API void WINAPI glGetCompressedTexImage( GLenum target, GLint level, GLvo
 
 OPENGL_API void WINAPI glTexParameterfv( GLenum target, GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexParameterfv( target, pname, params ) );
 	int targetIndex = UTIL_GLTextureTargettoInternalIndex( target );
 	if (targetIndex < 0 || targetIndex >= D3D_TEXTARGET_MAX) {
 		D3DGlobal.lastError = E_INVALIDARG;
@@ -1435,6 +1440,7 @@ OPENGL_API void WINAPI glGetTexParameteriv( GLenum target, GLenum pname, GLint *
 
 OPENGL_API void WINAPI glTexEnvfv( GLenum target, GLenum pname, const GLfloat *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexEnvfv( target, pname, params ) );
 	switch (target) 
 	{
 	default:
@@ -1670,6 +1676,7 @@ OPENGL_API void WINAPI glTexEnvf( GLenum target, GLenum pname, GLfloat param )
 
 OPENGL_API void WINAPI glTexEnviv( GLenum target, GLenum pname, const GLint *params )
 {
+    D3DLISTS_RECORD( D3DLists_RecordTexEnviv( target, pname, params ) );
 	if (target == GL_TEXTURE_ENV) {
 		if (pname == GL_TEXTURE_ENV_COLOR) {
 			D3DCOLOR envColor = D3DCOLOR_ARGB( QINDIEGL_CLAMP( (GLfloat)(params[3] / INT_MAX) * 255 ),
@@ -1853,6 +1860,7 @@ OPENGL_API void WINAPI glGetTexLevelParameteriv( GLenum target, GLint level, GLe
 
 OPENGL_API void WINAPI glActiveTexture( GLenum texture )
 {
+    D3DLISTS_RECORD( D3DLists_RecordActiveTexture( texture ) );
 	int stageIndex = texture - GL_TEXTURE0_ARB;
 	if (stageIndex < 0 || stageIndex >= D3DGlobal.maxActiveTMU) {
 		logPrintf("WARNING: glActiveTexture - bad stage %i\n", stageIndex);
@@ -1875,6 +1883,7 @@ OPENGL_API void WINAPI glClientActiveTexture( GLenum texture )
 }
 OPENGL_API void WINAPI glSelectTexture( GLenum texture )
 {
+    D3DLISTS_RECORD( D3DLists_RecordSelectTexture( texture ) );
 	int stageIndex = texture - GL_TEXTURE0_SGIS;
 	if (stageIndex < 0 || stageIndex >= D3DGlobal.maxActiveTMU) {
 		logPrintf("WARNING: glSelectTextureSGIS - bad stage %i\n", stageIndex);

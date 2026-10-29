@@ -25,6 +25,7 @@
 #include "d3d_matrix_stack.hpp"
 #include "d3d_texture.hpp"
 #include "d3d_matrix_detection.hpp"
+#include "d3d_lists.hpp"
 #include <map>
 
 //==================================================================================
@@ -539,6 +540,19 @@ template<typename T> static void glGet( GLenum pname, T *params )
 		params[2] = T(b);
 		params[3] = T(a);
 		break; }
+
+    case GL_LIST_BASE:
+        params[0] = (T)D3DLists_GetListBase();
+        break;
+    case GL_LIST_INDEX:
+        params[0] = (T)D3DLists_GetListIndex();
+        break;
+    case GL_LIST_MODE:
+        params[0] = (T)D3DLists_GetListMode();
+        break;
+    case GL_MAX_LIST_NESTING:
+        params[0] = (T)IMPL_MAX_LIST_NESTING;
+        break;
 
 	default: {
 		static std::map<uint32_t, bool> warn_shown;

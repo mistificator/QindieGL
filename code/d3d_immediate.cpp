@@ -23,6 +23,7 @@
 #include "d3d_state.hpp"
 #include "d3d_utils.hpp"
 #include "d3d_immediate.hpp"
+#include "d3d_lists.hpp"
 
 //==================================================================================
 // OpenGL Immediate Mode
@@ -400,153 +401,140 @@ void D3DIMBuffer :: AddVertex( float x, float y, float z, float w )
 // These immediate mode functions modify
 // current state and do not draw anything
 //=========================================
-template<typename T> inline void D3D_SetColor( T red, T green, T blue )
+inline void D3D_ApplyColorDWORD( DWORD color )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		0xFF,
-		QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ),
-		QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ),
-		QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 )
-	 );
+    D3DLISTS_RECORD( D3DLists_RecordColor( color ) );
+    D3DState.CurrentState.isSet.bits.color = 1;
+    D3DState.CurrentState.currentColor = color;
 }
-template<typename T> inline void D3D_SetColor( T red, T green, T blue, T alpha )
+
+template<typename T>
+inline void D3D_SetColor( T red, T green, T blue )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		QINDIEGL_CLAMP( ( alpha / std::numeric_limits<T>::max( ) ) * 255 ),
-		QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ),
-		QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ),
-		QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 )
-	 );
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB(
+        0xFF,
+        QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ),
+        QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ),
+        QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 )
+        ) );
+}
+template<typename T>
+inline void D3D_SetColor( T red, T green, T blue, T alpha )
+{
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB(
+        QINDIEGL_CLAMP( ( alpha / std::numeric_limits<T>::max( ) ) * 255 ),
+        QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ),
+        QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ),
+        QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 )
+        ) );
 }
 inline void D3D_SetColor( GLbyte red, GLbyte green, GLbyte blue, GLbyte alpha )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		( BYTE )alpha,
-		( BYTE )red,
-		( BYTE )green,
-		( BYTE )blue
-	 );
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB( ( BYTE )alpha, ( BYTE )red, ( BYTE )green, ( BYTE )blue ) );
 }
 inline void D3D_SetColor( GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		alpha,
-		red,
-		green,
-		blue
-	 );
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB( alpha, red, green, blue ) );
 }
 inline void D3D_SetColor( GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		QINDIEGL_CLAMP( alpha * 255.0f ),
-		QINDIEGL_CLAMP( red * 255.0f ),
-		QINDIEGL_CLAMP( green * 255.0f ),
-		QINDIEGL_CLAMP( blue * 255.0f )
-	 );
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB(
+        QINDIEGL_CLAMP( alpha * 255.0f ),
+        QINDIEGL_CLAMP( red * 255.0f ),
+        QINDIEGL_CLAMP( green * 255.0f ),
+        QINDIEGL_CLAMP( blue * 255.0f )
+        ) );
 }
 inline void D3D_SetColor( GLdouble red, GLdouble green, GLdouble blue, GLdouble alpha )
 {
-	D3DState.CurrentState.isSet.bits.color = 1;
-	D3DState.CurrentState.currentColor = D3DCOLOR_ARGB( 
-		QINDIEGL_CLAMP( (FLOAT)alpha * 255.0f ),
-		QINDIEGL_CLAMP( (FLOAT)red * 255.0f ),
-		QINDIEGL_CLAMP( (FLOAT)green * 255.0f ),
-		QINDIEGL_CLAMP( (FLOAT)blue * 255.0f )
-	 );
+    D3D_ApplyColorDWORD( D3DCOLOR_ARGB(
+        QINDIEGL_CLAMP( (FLOAT)alpha * 255.0f ),
+        QINDIEGL_CLAMP( (FLOAT)red * 255.0f ),
+        QINDIEGL_CLAMP( (FLOAT)green * 255.0f ),
+        QINDIEGL_CLAMP( (FLOAT)blue * 255.0f )
+        ) );
 }
-template<typename T> inline void D3D_SetColor2( T red, T green, T blue )
+
+inline void D3D_ApplyColor2RGB( DWORD rgb24 )
 {
-	D3DState.CurrentState.isSet.bits.color2 = 1;
-	D3DState.CurrentState.currentColor2 &= 0xFF000000;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ) << 16;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ) << 8;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 );
+    D3DLISTS_RECORD( D3DLists_RecordColor2( rgb24 ) );
+    D3DState.CurrentState.isSet.bits.color2 = 1;
+    D3DState.CurrentState.currentColor2 = ( D3DState.CurrentState.currentColor2 & 0xFF000000 ) | ( rgb24 & 0x00FFFFFF );
+}
+
+template<typename T>
+inline void D3D_SetColor2( T red, T green, T blue )
+{
+    DWORD rgb = ( QINDIEGL_CLAMP( ( red / std::numeric_limits<T>::max( ) ) * 255 ) << 16 ) |
+                ( QINDIEGL_CLAMP( ( green / std::numeric_limits<T>::max( ) ) * 255 ) << 8 ) |
+                QINDIEGL_CLAMP( ( blue / std::numeric_limits<T>::max( ) ) * 255 );
+    D3D_ApplyColor2RGB( rgb );
 }
 inline void D3D_SetColor2( GLbyte red, GLbyte green, GLbyte blue )
 {
-	D3DState.CurrentState.isSet.bits.color2 = 1;
-	D3DState.CurrentState.currentColor2 &= 0xFF000000;
-	D3DState.CurrentState.currentColor2 |= ( BYTE )red << 16;
-	D3DState.CurrentState.currentColor2 |= ( BYTE )green << 8;
-	D3DState.CurrentState.currentColor2 |= ( BYTE )blue;
+    D3D_ApplyColor2RGB( ( ( BYTE )red << 16 ) | ( ( BYTE )green << 8 ) | ( BYTE )blue );
 }
 inline void D3D_SetColor2( GLubyte red, GLubyte green, GLubyte blue )
 {
-	D3DState.CurrentState.isSet.bits.color2 = 1;
-	D3DState.CurrentState.currentColor2 &= 0xFF000000;
-	D3DState.CurrentState.currentColor2 |= red << 16;
-	D3DState.CurrentState.currentColor2 |= green << 8;
-	D3DState.CurrentState.currentColor2 |= blue;
+    D3D_ApplyColor2RGB( ( red << 16 ) | ( green << 8 ) | blue );
 }
 inline void D3D_SetColor2( GLfloat red, GLfloat green, GLfloat blue )
 {
-	D3DState.CurrentState.isSet.bits.color2 = 1;
-	D3DState.CurrentState.currentColor2 &= 0xFF000000;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( red * 255.0f ) << 16;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( green * 255.0f ) << 8;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( blue * 255.0f );
+    D3D_ApplyColor2RGB( ( QINDIEGL_CLAMP( red * 255.0f ) << 16 ) | ( QINDIEGL_CLAMP( green * 255.0f ) << 8 ) | QINDIEGL_CLAMP( blue * 255.0f ) );
 }
 inline void D3D_SetColor2( GLdouble red, GLdouble green, GLdouble blue )
 {
-	D3DState.CurrentState.isSet.bits.color2 = 1;
-	D3DState.CurrentState.currentColor2 &= 0xFF000000;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( (FLOAT)red * 255.0f ) << 16;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( (FLOAT)green * 255.0f ) << 8;
-	D3DState.CurrentState.currentColor2 |= QINDIEGL_CLAMP( (FLOAT)blue * 255.0f );
+    D3D_ApplyColor2RGB( ( QINDIEGL_CLAMP( (FLOAT)red * 255.0f ) << 16 ) | ( QINDIEGL_CLAMP( (FLOAT)green * 255.0f ) << 8 ) | QINDIEGL_CLAMP( (FLOAT)blue * 255.0f ) );
 }
+
 inline void D3D_SetFogCoord( GLfloat value )
 {
-	D3DState.CurrentState.isSet.bits.fog = 1;
-	GLubyte byteValue = 255 - static_cast<GLubyte>( QINDIEGL_CLAMP( value * 255.0f ) );
-	D3DState.CurrentState.currentColor2 &= ( byteValue << 24 );
-	D3DState.CurrentState.currentColor2 |= ( byteValue << 24 );
+    D3DLISTS_RECORD( D3DLists_RecordFogCoord( value ) );
+    D3DState.CurrentState.isSet.bits.fog = 1;
+    GLubyte byteValue = 255 - static_cast<GLubyte>( QINDIEGL_CLAMP( value * 255.0f ) );
+    D3DState.CurrentState.currentColor2 &= ( byteValue << 24 );
+    D3DState.CurrentState.currentColor2 |= ( byteValue << 24 );
 }
-template<typename T> inline void D3D_SetNormal( T x, T y, T z )
-{
-	D3DState.CurrentState.isSet.bits.norm = 1;
-	D3DState.CurrentState.currentNormal[0] = (FLOAT)x / std::numeric_limits<T>::max( );
-	D3DState.CurrentState.currentNormal[1] = (FLOAT)y / std::numeric_limits<T>::max( );
-	D3DState.CurrentState.currentNormal[2] = (FLOAT)z / std::numeric_limits<T>::max( );
-}
+
 inline void D3D_SetNormal( GLfloat x, GLfloat y, GLfloat z )
 {
-	D3DState.CurrentState.isSet.bits.norm = 1;
-	D3DState.CurrentState.currentNormal[0] = x;
-	D3DState.CurrentState.currentNormal[1] = y;
-	D3DState.CurrentState.currentNormal[2] = z;
+    D3DLISTS_RECORD( D3DLists_RecordNormal( x, y, z ) );
+    D3DState.CurrentState.isSet.bits.norm = 1;
+    D3DState.CurrentState.currentNormal[0] = x;
+    D3DState.CurrentState.currentNormal[1] = y;
+    D3DState.CurrentState.currentNormal[2] = z;
+}
+template<typename T>
+inline void D3D_SetNormal( T x, T y, T z )
+{
+    D3D_SetNormal(
+        (FLOAT)x / std::numeric_limits<T>::max( ),
+        (FLOAT)y / std::numeric_limits<T>::max( ),
+        (FLOAT)z / std::numeric_limits<T>::max( )
+        );
 }
 inline void D3D_SetNormal( GLdouble x, GLdouble y, GLdouble z )
 {
-	D3DState.CurrentState.isSet.bits.norm = 1;
-	D3DState.CurrentState.currentNormal[0] = (FLOAT)x;
-	D3DState.CurrentState.currentNormal[1] = (FLOAT)y;
-	D3DState.CurrentState.currentNormal[2] = (FLOAT)z;
+    D3D_SetNormal( (FLOAT)x, (FLOAT)y, (FLOAT)z );
 }
-template<typename T> inline void D3D_SetTexCoord( GLenum target, T s, T t, T r, T q, int num )
+
+template<typename T>
+inline void D3D_SetTexCoord( GLenum target, T s, T t, T r, T q, int num )
 {
-	//HACK: workaround for Quake3: it uses targets 0 and 1 instead of GL_TEXTURE0_ARB and GL_TEXTURE1_ARB
-	//HACK: it seems that drivers were fixed after Carmack's code, not vise versa : )
-	int stage = target;
-	if ( stage >= GL_TEXTURE0_ARB ) stage -= GL_TEXTURE0_ARB;
-	if ( stage < 0 || stage >= D3DGlobal.maxActiveTMU ) return;
-
-	D3DState.CurrentState.isSet.bits.texcoord |= DWORD( num -1 ) << (stage * 2);
-
-	D3DState.CurrentState.currentTexCoord[stage][0] = (FLOAT)s;
-	D3DState.CurrentState.currentTexCoord[stage][1] = (FLOAT)t;
-	D3DState.CurrentState.currentTexCoord[stage][2] = (FLOAT)r;
-	D3DState.CurrentState.currentTexCoord[stage][3] = (FLOAT)q;
-
-	if ( D3DState.TransformState.texcoordFixEnabled ) {
-		D3DState.CurrentState.currentTexCoord[stage][0] += D3DState.TransformState.texcoordFix[0];
-		D3DState.CurrentState.currentTexCoord[stage][1] += D3DState.TransformState.texcoordFix[1];
-	}
+    D3DLISTS_RECORD( D3DLists_RecordTexCoord( target, (FLOAT)s, (FLOAT)t, (FLOAT)r, (FLOAT)q, num ) );
+    int stage = target;
+    if ( stage >= GL_TEXTURE0_ARB ) stage -= GL_TEXTURE0_ARB;
+    if ( stage < 0 || stage >= D3DGlobal.maxActiveTMU )
+        return;
+    D3DState.CurrentState.isSet.bits.texcoord |= DWORD( num - 1 ) << ( stage * 2 );
+    D3DState.CurrentState.currentTexCoord[stage][0] = (FLOAT)s;
+    D3DState.CurrentState.currentTexCoord[stage][1] = (FLOAT)t;
+    D3DState.CurrentState.currentTexCoord[stage][2] = (FLOAT)r;
+    D3DState.CurrentState.currentTexCoord[stage][3] = (FLOAT)q;
+    if ( D3DState.TransformState.texcoordFixEnabled ) {
+        D3DState.CurrentState.currentTexCoord[stage][0] += D3DState.TransformState.texcoordFix[0];
+        D3DState.CurrentState.currentTexCoord[stage][1] += D3DState.TransformState.texcoordFix[1];
+    }
 }
 
 OPENGL_API void WINAPI glColor3b( GLbyte red, GLbyte green, GLbyte blue )
@@ -1115,15 +1103,20 @@ OPENGL_API void WINAPI glFogCoordfv( GLfloat *coord )
 // buffer collecting all other current state
 // values
 //=========================================
-template<typename T> inline void D3D_AddVertex( T x, T y, T z, T w )
+template<typename T>
+inline void D3D_AddVertex( T x, T y, T z, T w )
 {
-	assert( D3DGlobal.pIMBuffer != NULL );
-	D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z, (FLOAT)w );
+    D3DLISTS_RECORD( D3DLists_RecordVertex4( (FLOAT)x, (FLOAT)y, (FLOAT)z, (FLOAT)w ) );
+    assert( D3DGlobal.pIMBuffer != NULL );
+    D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z, (FLOAT)w );
 }
-template<typename T> inline void D3D_AddVertex( T x, T y, T z )
+
+template<typename T>
+inline void D3D_AddVertex( T x, T y, T z )
 {
-	assert( D3DGlobal.pIMBuffer != NULL );
-	D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z );
+    D3DLISTS_RECORD( D3DLists_RecordVertex3( (FLOAT)x, (FLOAT)y, (FLOAT)z ) );
+    assert( D3DGlobal.pIMBuffer != NULL );
+    D3DGlobal.pIMBuffer->AddVertex( (FLOAT)x, (FLOAT)y, (FLOAT)z );
 }
 
 OPENGL_API void WINAPI glVertex2d( GLdouble x, GLdouble y )
@@ -1228,33 +1221,33 @@ OPENGL_API void WINAPI glVertex4sv( const GLshort *v )
 //=========================================
 OPENGL_API void WINAPI glBegin( GLenum mode )
 {
-	D3DState_Check( );
-	D3DState_AssureBeginScene( );
-	assert( D3DGlobal.pIMBuffer != NULL );
-	D3DGlobal.pIMBuffer->Begin( mode );
+    D3DLISTS_RECORD( D3DLists_RecordBegin( mode ) );
+    D3DState_Check( );
+    D3DState_AssureBeginScene( );
+    assert( D3DGlobal.pIMBuffer != NULL );
+    D3DGlobal.pIMBuffer->Begin( mode );
 }
 
 OPENGL_API void WINAPI glEnd( )
 {
-	assert( D3DGlobal.pIMBuffer != NULL );
-	D3DGlobal.pIMBuffer->End( );
-	D3DState.CurrentState.isSet.all = 0;
+    D3DLISTS_RECORD( D3DLists_RecordEnd() );
+    assert( D3DGlobal.pIMBuffer != NULL );
+    D3DGlobal.pIMBuffer->End( );
+    D3DState.CurrentState.isSet.all = 0;
 }
 
 //=========================================
 // Rect specification
 //=========================================
-template<typename T> inline void D3D_Rect( T x1, T y1, T x2, T y2 )
+template<typename T>
+inline void D3D_Rect( T x1, T y1, T x2, T y2 )
 {
-	D3DState_Check( );
-	D3DState_AssureBeginScene( );
-	assert( D3DGlobal.pIMBuffer != NULL );
-	D3DGlobal.pIMBuffer->Begin( GL_POLYGON );
-		D3D_AddVertex( x1, y1, ( T )0 );
-		D3D_AddVertex( x2, y1, ( T )0 );
-		D3D_AddVertex( x2, y2, ( T )0 );
-		D3D_AddVertex( x1, y2, ( T )0 );
-	D3DGlobal.pIMBuffer->End( );
+    glBegin( GL_POLYGON );
+    D3D_AddVertex( x1, y1, ( T )0 );
+    D3D_AddVertex( x2, y1, ( T )0 );
+    D3D_AddVertex( x2, y2, ( T )0 );
+    D3D_AddVertex( x1, y2, ( T )0 );
+    glEnd( );
 }
 
 OPENGL_API void WINAPI glRectd( GLdouble x1, GLdouble y1, GLdouble x2, GLdouble y2 )
