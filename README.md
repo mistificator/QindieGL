@@ -71,7 +71,7 @@ Please also read **Security Notice** before using QindieGL!
 - **Alpha-blend - full**
 - **Immediate mode - full**
 - **Texture objects - almost full** (glCopyTex(Sub)Image is not supported)
-- Display lists - no
+- **Display lists - almost full (?)**
 - **Culling - full**
 - **Clip planes - full**
 - **Lighting - partial** (two-side lighting model and spotlights are not supported)
